@@ -1,0 +1,22 @@
+# Byte-compiled / optimized / DLL files
+__pycache__/
+*.py[cod]
+*$py.class
+
+# Virtual environment
+venv/
+.env/
+
+# Pygame temporary or backup files
+*.py~ 
+
+# OS-specific files
+.DS_Store
+Thumbs.db
+
+# Logs and debug
+*.log
+
+# IDE/editor folders
+.vscode/
+.idea/
