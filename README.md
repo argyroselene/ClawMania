@@ -1,16 +1,15 @@
 # ClawMania
 
-ClawMania is a **Python/Pygame arcade claw machine simulation**. Players control different types of claws to grab prizes from bins, facing increasing difficulty levels, moving bins, and randomized toy sizes. 
+**ClawMania** is a simulation-based arcade claw machine game modeling imperfect mechanics and probability.
 
-## Project Structure
+## Overview
+- **Practice Mode**: Fully configurable mechanics to learn the physics.
+- **Game Mode**: 5 levels of increasing difficulty.
 
-```text
-ClawMania/
-│ main.py
-│ README.md
-│ requirements.txt
-│ .gitignore
-├─ src/            # Python classes (claw, toy, bin, machine)
-├─ assets/         # Images, sounds, fonts
-├─ levels/         # Level configuration files
-└─ docs/          
+## Dependencies
+- Python 3.x
+- `pygame`
+- `numpy`
+
+## Usage
+`python main.py`
