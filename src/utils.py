@@ -30,3 +30,21 @@ def get_font(size):
 
 # Game Constants
 GRAVITY = 0.5
+
+import os
+
+def get_asset_path(*path_parts):
+    # .../src/utils.py -> .../src -> .../ClawMania (Root)
+    base_path = os.path.dirname(os.path.dirname(__file__))
+    return os.path.join(base_path, "assets", *path_parts)
+
+def load_image(filename, width=None, height=None):
+    try:
+        path = get_asset_path("images", filename)
+        image = pygame.image.load(path).convert_alpha()
+        if width and height:
+            image = pygame.transform.scale(image, (width, height))
+        return image
+    except Exception as e:
+        print(f"Failed to load image {filename}: {e}")
+        return None

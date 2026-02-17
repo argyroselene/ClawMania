@@ -1,5 +1,5 @@
 import pygame
-from src.utils import SCREEN_WIDTH, SCREEN_HEIGHT, WHITE, GRAY, HOT_PINK, CYAN, NEON_GREEN
+from src.utils import SCREEN_WIDTH, SCREEN_HEIGHT, load_image
 
 class Claw:
     def __init__(self, x, y, config):
@@ -8,6 +8,16 @@ class Claw:
         self.width = 40
         self.height = 60
         self.config = config
+        
+        # Load Assets
+        self.img_open = load_image("claw_open.png", self.width, self.height)
+        self.img_closed = load_image("claw_closed.png", self.width, self.height)
+        # For arm, we might want to keep original width but stretch height dynamically, 
+        # or tile it. For simplicity, let's load it raw and crop/tile in draw.
+        self.img_arm = load_image("claw_arm.png") 
+        if self.img_arm:
+             # Scale arm width to something reasonable if needed, e.g., 10px
+             self.img_arm = pygame.transform.scale(self.img_arm, (10, self.img_arm.get_height()))
         
         # Physics / Config properties
         self.move_speed = 5
@@ -20,9 +30,10 @@ class Claw:
         # State Machine
         self.state = "IDLE" # IDLE, MOVING, DROPPING, GRABBING, LIFTING, RETURNING, RELEASING
         self.target_y = y
-        self.max_drop_depth = 450
+        self.max_drop_depth = 560 # Increased from 450 to reach bin floor (approx 590)
         self.grab_timer = 0
         self.held_toy = None
+
 
     def update(self):
         dt = 1/60 # approximation
@@ -73,21 +84,34 @@ class Claw:
             self.state = "IDLE" # Reset
 
     def draw(self, screen):
-        # Draw Rope
-        pygame.draw.line(screen, GRAY, (self.x, 0), (self.x, self.y), 2)
+        # Draw Rope (Arm)
+        if self.img_arm:
+            # Stretch or tile? Let's just draw a line for now if image is missing, 
+            # or stretch the image to the current length.
+            # Arm goes from (self.x, 0) to (self.x, self.y)
+            # Center the arm image on self.x
+            arm_height = max(1, self.y)
+            # Scale simply for now
+            scaled_arm = pygame.transform.scale(self.img_arm, (self.img_arm.get_width(), int(arm_height)))
+            screen.blit(scaled_arm, (self.x - self.img_arm.get_width()//2, 0))
+        else:
+             # Fallback
+             pygame.draw.line(screen, (100, 100, 100), (self.x, 0), (self.x, self.y), 2)
         
         # Draw Claw Body
-        rect = pygame.Rect(self.x - self.width//2, self.y, self.width, self.height)
-        pygame.draw.rect(screen, HOT_PINK, rect)
-        pygame.draw.rect(screen, CYAN, rect, 2) # Border
-        
-        # Draw "fingers"
-        finger_color = NEON_GREEN
+        image_to_draw = self.img_open
         if self.state in ["GRABBING", "LIFTING", "RETURNING"]:
-            # Closed
-            pygame.draw.line(screen, finger_color, (self.x - 15, self.y + 60), (self.x, self.y + 80), 3)
-            pygame.draw.line(screen, finger_color, (self.x + 15, self.y + 60), (self.x, self.y + 80), 3)
+            if self.img_closed:
+                image_to_draw = self.img_closed
+        
+        if image_to_draw:
+            # Image is already scaled to width/height
+            # Draw centered on x, and top at y
+            # self.x is center X.
+            screen.blit(image_to_draw, (self.x - self.width//2, self.y))
         else:
-            # Open
-            pygame.draw.line(screen, finger_color, (self.x - 15, self.y + 60), (self.x - 25, self.y + 90), 3)
-            pygame.draw.line(screen, finger_color, (self.x + 15, self.y + 60), (self.x + 25, self.y + 90), 3)
+            # Fallback Geometric Drawing
+            rect = pygame.Rect(self.x - self.width//2, self.y, self.width, self.height)
+            pygame.draw.rect(screen, (255, 105, 180), rect)
+            pygame.draw.rect(screen, (0, 255, 255), rect, 2)
+

@@ -5,7 +5,6 @@ from src.utils import SCREEN_WIDTH, SCREEN_HEIGHT, FPS, BLACK
 def main():
     pygame.init()
     screen = pygame.display.set_mode((SCREEN_WIDTH, SCREEN_HEIGHT))
-    pygame.display.set_caption("ClawMania")
     clock = pygame.time.Clock()
     
     from src.game_manager import GameManager

@@ -45,12 +45,36 @@ class Toy:
             self.rect.y = self.y - self.height
 
     def draw(self, screen):
-        # Draw pixelated block
-        pygame.draw.rect(screen, self.color, self.rect)
-        pygame.draw.rect(screen, WHITE, self.rect, 2) # Highlight
+        # Construct the absolute path to the image
+        # In a real app we'd have a resource manager, but for now let's load it here or in __init__
+        # Ideally, we load it once. 
+        # But to keep it simple for this step:
         
-        # Inner detail to look "toy-like" (eyes?)
-        eye_color = (0, 0, 0)
-        eye_size = 4
-        pygame.draw.rect(screen, eye_color, (self.rect.x + self.width//4, self.rect.y + self.height//3, eye_size, eye_size))
-        pygame.draw.rect(screen, eye_color, (self.rect.x + 3*self.width//4 - eye_size, self.rect.y + self.height//3, eye_size, eye_size))
+        # We need to make sure the image is loaded. 
+        # For performance, we should load it in __init__ or have a shared loader.
+        # Let's add a static cache or just load in __init__ for now since there are few toys.
+        
+        if not hasattr(self, 'image'):
+            try:
+                # Assuming assets are in d:\Simulation project\ClawMania\assets\images\toy.png
+                # We need to get the base path.
+                import os
+                # __file__ is .../src/toy.py
+                # dirname -> .../src
+                # dirname -> .../ClawMania (Root)
+                base_path = os.path.dirname(os.path.dirname(__file__)) 
+                image_path = os.path.join(base_path, "assets", "images", "toy.png")
+                self.image = pygame.image.load(image_path).convert_alpha()
+
+                self.image = pygame.transform.scale(self.image, (self.width, self.height))
+            except Exception as e:
+                print(f"Error loading toy.png: {e}")
+                self.image = None
+
+        if self.image:
+            screen.blit(self.image, self.rect)
+        else:
+            # Fallback to rect
+            pygame.draw.rect(screen, self.color, self.rect)
+            pygame.draw.rect(screen, WHITE, self.rect, 2)
+

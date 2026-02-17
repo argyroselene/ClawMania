@@ -1,7 +1,10 @@
-from src.utils import WHITE, BLACK, GRAY, LIGHT_GRAY, HOT_PINK, DEEP_PURPLE, NEON_GREEN, CYAN, PIXEL_YELLOW, BG_COLOR, UI_BG_COLOR, TEXT_COLOR, HIGHLIGHT_COLOR, get_font
+from src.utils import WHITE, BLACK, GRAY, LIGHT_GRAY, HOT_PINK, DEEP_PURPLE, NEON_GREEN, CYAN, PIXEL_YELLOW, BG_COLOR, UI_BG_COLOR, TEXT_COLOR, HIGHLIGHT_COLOR, get_font, load_image
 import pygame
 
 class Button:
+    # Class-level cache for images to avoid reloading for every button
+    img_normal = None
+    
     def __init__(self, x, y, width, height, text, action=None, color=UI_BG_COLOR, hover_color=HOT_PINK, text_color=TEXT_COLOR):
         self.rect = pygame.Rect(x, y, width, height)
         self.text = text
@@ -11,6 +14,10 @@ class Button:
         self.text_color = text_color
         self.font = get_font(24)
         self.border_color = CYAN
+        
+        if Button.img_normal is None:
+            Button.img_normal = load_image("btn_normal.png")
+
 
     def draw(self, screen):
         mouse_pos = pygame.mouse.get_pos()
@@ -19,11 +26,19 @@ class Button:
         current_color = self.hover_color if is_hovered else self.color
         current_text_color = DEEP_PURPLE if is_hovered else self.text_color
         
-        # Pixelated shadow
-        pygame.draw.rect(screen, (30, 0, 30), (self.rect.x + 4, self.rect.y + 4, self.rect.width, self.rect.height))
-        
-        pygame.draw.rect(screen, current_color, self.rect)
-        pygame.draw.rect(screen, self.border_color, self.rect, 3) # Thicker border
+        # Draw Button Background
+        if Button.img_normal:
+            # Scale to button size
+            img = pygame.transform.scale(Button.img_normal, (self.rect.width, self.rect.height))
+            if is_hovered:
+                # Simple brightness boost for hover
+                img.fill((30, 30, 30), special_flags=pygame.BLEND_RGB_ADD) 
+            screen.blit(img, self.rect)
+        else:
+             # Fallback
+            pygame.draw.rect(screen, (30, 0, 30), (self.rect.x + 4, self.rect.y + 4, self.rect.width, self.rect.height))
+            pygame.draw.rect(screen, current_color, self.rect)
+            pygame.draw.rect(screen, self.border_color, self.rect, 3) # Thicker border
         
         text_surf = self.font.render(self.text, False, current_text_color) # False for aliasing (pixel look)
         text_rect = text_surf.get_rect(center=self.rect.center)
