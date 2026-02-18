@@ -1,19 +1,24 @@
 import random
+import pygame
 
-class Level2:
+class Level3:
     """
-    Level 2: Simple Collection (3 toys, 5 chances)
+    Level 3: Unstable Platform
+    - Moving bin (bin_speed > 0)
+    - Grip strength decays over time while holding
+    - Continuous slip check while lifting/returning
+    - Larger drop offset
     """
     def __init__(self):
         self.config = {
-            "name": "Level 2 (Normal)",
-            "grip_strength": 0.60, 
-            "slip_probability": 0.10,
-            "drop_offset_range": 5.0,
-            "control_time": 10.0,
-            "bin_speed": 1.0, 
+            "name": "Level 3 (Unstable)",
+            "grip_strength": 0.50, # Initial grip
+            "slip_probability": 0.005, # Per-frame baseline slip probability
+            "drop_offset_range": 10.0,
+            "control_time": 7.0,
+            "bin_speed": 1.5, 
             "toy_type": "single",
-            "toy_fixed_position": True
+            "toy_fixed_position": False
         }
         
         # State Tracking
@@ -27,7 +32,9 @@ class Level2:
         self.message = ""
         
         self.active_attempt = False
-        self.slip_checked = False
+        self.slip_checked = False # Not strictly used for single check here, but for state consistency
+        self.grab_duration = 0.0
+        self.decay_rate = 0.02 # Per second reduction in grip
 
     def get_config(self):
         return self.config
@@ -46,19 +53,26 @@ class Level2:
         # --- DETECT ATTEMPT START ---
         if claw.state == "LIFTING" and not self.active_attempt:
             self.active_attempt = True
-            self.slip_checked = False
+            self.grab_duration = 0.0
 
-        # --- SLIP CHECK ---
-        if claw.state in ["LIFTING", "RETURNING"] and claw.held_toy and not self.slip_checked:
-            if self.check_slip():
+        # --- CONTINUOUS SLIP CHECK & DECAY ---
+        if claw.state in ["LIFTING", "RETURNING"] and claw.held_toy:
+            self.grab_duration += dt
+            
+            # effective_grip = initial_grip - (decay_rate * duration)
+            effective_grip = max(0.1, float(self.config["grip_strength"]) - (self.decay_rate * self.grab_duration))
+            
+            # Dynamic slip probability: baseline + penalty for weak grip
+            # Increase base probability as grip decays
+            dynamic_slip = float(self.config["slip_probability"]) + (1.0 - effective_grip) * 0.01
+            
+            if random.random() < dynamic_slip:
                 # Apply slip
                 claw.held_toy.grabbed = False
-                # Reset position to bin (approximate)
+                # Reset position to bin
                 claw.held_toy.y = bin_obj.y + bin_obj.height - 10
                 claw.held_toy = None
-                
-                self.message = "Slipped!"
-            self.slip_checked = True
+                self.message = "Lost Grip!"
 
         # --- DETECT ATTEMPT END (Cycle Complete) ---
         if self.active_attempt and claw.state == "IDLE":
@@ -71,12 +85,8 @@ class Level2:
         else:
             status["message"] = self.message
 
-        # Reset transient feedback (except for game over checks)
-        # Note: We keep self.message for one update cycle to let Machine catch it
-        # Actually, self.message might be better handled if we reset it AFTER status is returned or next frame
-        # But for now, let's just make sure it's returned.
-        curr_msg = self.message
-        self.message = "" # Reset for next frame
+        # Reset transient feedback
+        self.message = ""
         self.last_score_awarded = 0
 
         # Win/Loss Conditions
@@ -92,18 +102,10 @@ class Level2:
         return status
 
     def on_toy_collected(self):
-        # Simple Scoring
-        score = 100 
-        
-        # Update State
         self.toys_collected += 1
-        self.level_score += score
-        self.last_score_awarded = score
-        self.message = f"Score! +{score}"
+        self.message = "COLLECTED!"
 
     def resolve_grab(self, claw_rect, toys):
-        # Attempts are now tracked in update() cycle end
-        
         cx, cy, cw, ch = claw_rect
         for toy in toys:
             if toy.grabbed:
@@ -111,20 +113,20 @@ class Level2:
             
             # AABB collision check
             toy_left = toy.x
-            # toy.y is the floor, height is up. Rect is (x, y-h, w, h)
             toy_top = toy.y - toy.height
             
             if (cx < toy_left + toy.width and cx + cw > toy_left and
                 cy < toy.y and cy + ch > toy_top):
                 
-                # Grip strength check
+                # Initial grab probability
                 if random.random() <= float(self.config["grip_strength"]):
                     toy.grabbed = True
                     return toy
         return None
 
     def check_slip(self):
-        return random.random() < self.config["slip_probability"]
+        # Continuous check handled in update() for Level 3
+        return False
 
     def get_drop_offset(self):
         r = self.config["drop_offset_range"]
