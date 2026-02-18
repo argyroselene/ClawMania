@@ -152,6 +152,11 @@ class Machine:
              c_color = (255, 50, 50) if rem_chances <= 1 else (0, 255, 0)
              chances_surf = font.render(chances_str, False, c_color)
              screen.blit(chances_surf, (20, 40))
+             
+             # Feedback Message (Below stats)
+             if self.last_result:
+                 msg_surf = font.render(self.last_result, True, (255, 255, 0))
+                 screen.blit(msg_surf, (20, 70))
 
         # Popup Message (Center)
         if self.popup_message and pygame.time.get_ticks() < self.popup_end_time:

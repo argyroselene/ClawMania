@@ -46,7 +46,7 @@ class Level1:
         # --- SINGLE SLIP CHECK ---
         if claw.state == "LIFTING" and claw.held_toy and not self.slip_checked:
             if random.random() <= self.config["slip_probability"]:
-                self.apply_slip(claw)
+                self.apply_slip(claw, bin_obj)
                 status["message"] = "Slipped!"
             self.slip_checked = True
 
@@ -128,9 +128,13 @@ class Level1:
                     return toy
         return None
 
-    def apply_slip(self, claw):
+    def apply_slip(self, claw, bin_obj=None):
         if claw.held_toy:
-            claw.held_toy.grabbed = False
+            toy = claw.held_toy
+            toy.grabbed = False
+            # If bin_obj is provided, reset to its floor
+            if bin_obj:
+                toy.y = bin_obj.y + bin_obj.height - 10
             claw.held_toy = None
 
     def get_drop_offset(self):

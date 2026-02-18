@@ -7,10 +7,12 @@ from src.machine import Machine
 try:
     from src.levels.level1 import Level1
     from src.levels.level2 import Level2
+    from src.levels.level3 import Level3
 except ImportError:
     # Fallback/Placeholder
     Level1 = None
     Level2 = None
+    Level3 = None
 
 class GameManager:
     def __init__(self):
@@ -29,7 +31,7 @@ class GameManager:
         self.machine = None
         
         # Level System
-        self.levels = [Level1, Level2] # registry
+        self.levels = [Level1, Level2, Level3] # registry
         self.current_level_index = 0
 
         # Assets
@@ -215,7 +217,7 @@ class GameManager:
             self.btn_start_level.draw(screen)
 
         elif self.state == "PRACTICE_PARAMS":
-            self.draw_title(screen, "Practice Config")
+
             self.btn_default.draw(screen)
             self.btn_custom.draw(screen)
             self.btn_back_mode.draw(screen)

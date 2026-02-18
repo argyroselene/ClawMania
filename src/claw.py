@@ -78,9 +78,7 @@ class Claw:
         elif self.state == "RELEASING":
             # Open claw, drop toy
             # Apply release offset
-            if self.held_toy:
-                self.held_toy = None
-            
+            # held_toy is cleared by Machine.drop_toy()
             self.state = "IDLE" # Reset
 
     def draw(self, screen):
