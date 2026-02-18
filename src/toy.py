@@ -12,22 +12,22 @@ class Toy:
         
         # Properties based on size
         if size == "small":
-            self.width = 30
-            self.height = 30
+            self.width = 60
+            self.height = 60
             self.weight_factor = 0.8
             self.difficulty_factor = 1.2 # Harder to grab small things? Or easier? Specs said "Small toys may still slip"
             self.color = HOT_PINK
             self.points = 10
         elif size == "medium":
-            self.width = 40
-            self.height = 40
+            self.width = 80
+            self.height = 80
             self.weight_factor = 1.0
             self.difficulty_factor = 1.0
             self.color = PIXEL_YELLOW
             self.points = 20
         elif size == "large":
-            self.width = 50
-            self.height = 50
+            self.width = 100
+            self.height = 100
             self.weight_factor = 1.5
             self.difficulty_factor = 0.7 # Easier to target, harder to hold? 
             # Let's stick to "Difficulty Factor" as 1.0 for now and tune later

@@ -5,8 +5,8 @@ class Claw:
     def __init__(self, x, y, config):
         self.x = x
         self.y = y
-        self.width = 40
-        self.height = 60
+        self.width = 80
+        self.height = 120
         self.config = config
         
         # Load Assets
@@ -16,8 +16,8 @@ class Claw:
         # or tile it. For simplicity, let's load it raw and crop/tile in draw.
         self.img_arm = load_image("claw_arm.png") 
         if self.img_arm:
-             # Scale arm width to something reasonable if needed, e.g., 10px
-             self.img_arm = pygame.transform.scale(self.img_arm, (10, self.img_arm.get_height()))
+             # Scale arm width to something reasonable if needed, e.g., 20px
+             self.img_arm = pygame.transform.scale(self.img_arm, (20, self.img_arm.get_height()))
         
         # Physics / Config properties
         self.move_speed = 5
@@ -30,7 +30,7 @@ class Claw:
         # State Machine
         self.state = "IDLE" # IDLE, MOVING, DROPPING, GRABBING, LIFTING, RETURNING, RELEASING
         self.target_y = y
-        self.max_drop_depth = 560 # Increased from 450 to reach bin floor (approx 590)
+        self.max_drop_depth = 470 # Adjusted for larger claw height (590 floor - 120 height)
         self.grab_timer = 0
         self.held_toy = None
 
