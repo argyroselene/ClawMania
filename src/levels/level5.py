@@ -1,19 +1,21 @@
 import random
 
-class Level2:
+class Level5:
     """
-    Level 2: Simple Collection (3 toys, 5 chances)
+    Level 5: Nightmare
+    - Timer: 4 seconds
+    - Very High Difficulty
     """
     def __init__(self):
         self.config = {
-            "name": "Level 2 (Normal)",
-            "grip_strength": 0.60, 
-            "slip_probability": 0.10,
-            "drop_offset_range": 5.0,
-            "control_time": 9.0,
-            "bin_speed": 1.0, 
+            "name": "Level 5 (Nightmare)",
+            "grip_strength": 0.20, 
+            "slip_probability": 0.15,
+            "drop_offset_range": 20.0,
+            "control_time": 4.0,
+            "bin_speed": 3.0,
             "toy_type": "single",
-            "toy_fixed_position": True
+            "toy_fixed_position": False
         }
         
         # State Tracking
@@ -43,43 +45,28 @@ class Level2:
             "toys_needed": self.toys_needed
         }
         
-        # --- DETECT ATTEMPT START ---
         if claw.state == "LIFTING" and not self.active_attempt:
             self.active_attempt = True
             self.slip_checked = False
-
-        # --- SLIP CHECK ---
+            
         if claw.state in ["LIFTING", "RETURNING"] and claw.held_toy and not self.slip_checked:
-            if self.check_slip():
-                # Apply slip
-                claw.held_toy.grabbed = False
-                # Reset position to bin (approximate)
-                claw.held_toy.y = bin_obj.y + bin_obj.height - 10
-                claw.held_toy = None
-                
-                self.message = "Slipped!"
-            self.slip_checked = True
+             if random.random() < self.config["slip_probability"]:
+                 self.apply_slip(claw, bin_obj)
+                 self.message = "Slipped!"
+             self.slip_checked = True
 
-        # --- DETECT ATTEMPT END (Cycle Complete) ---
         if self.active_attempt and claw.state == "IDLE":
              self.attempts_used += 1
              self.active_attempt = False
 
-        # Status HUD Message
         if not self.message:
             status["message"] = f"Toys: {self.toys_collected}/{self.toys_needed} | Chances: {self.max_attempts - self.attempts_used}"
         else:
             status["message"] = self.message
 
-        # Reset transient feedback (except for game over checks)
-        # Note: We keep self.message for one update cycle to let Machine catch it
-        # Actually, self.message might be better handled if we reset it AFTER status is returned or next frame
-        # But for now, let's just make sure it's returned.
-        curr_msg = self.message
-        self.message = "" # Reset for next frame
+        self.message = ""
         self.last_score_awarded = 0
 
-        # Win/Loss Conditions
         if self.toys_collected >= self.toys_needed:
             status["game_over"] = True
             status["success"] = True
@@ -92,40 +79,24 @@ class Level2:
         return status
 
     def on_toy_collected(self):
-        # Simple Scoring
-        score = 100 
-        
-        # Update State
         self.toys_collected += 1
-        self.level_score += score
-        self.last_score_awarded = score
-        self.message = f"Score! +{score}"
+        self.message = "COLLECTED!"
 
     def resolve_grab(self, claw_rect, toys):
-        # Attempts are now tracked in update() cycle end
-        
         cx, cy, cw, ch = claw_rect
         for toy in toys:
-            if toy.grabbed:
-                continue
-            
-            # AABB collision check
-            toy_left = toy.x
-            # toy.y is the floor, height is up. Rect is (x, y-h, w, h)
-            toy_top = toy.y - toy.height
-            
-            if (cx < toy_left + toy.width and cx + cw > toy_left and
-                cy < toy.y and cy + ch > toy_top):
-                
-                # Grip strength check
-                if random.random() <= float(self.config["grip_strength"]):
+            if toy.grabbed: continue
+            if (cx < toy.x + toy.width and cx + cw > toy.x and cy < toy.y and cy + ch > toy.y - toy.height):
+                 if random.random() <= self.config["grip_strength"]:
                     toy.grabbed = True
                     return toy
         return None
 
-    def check_slip(self):
-        return random.random() < self.config["slip_probability"]
+    def apply_slip(self, claw, bin_obj):
+        if claw.held_toy:
+            claw.held_toy.grabbed = False
+            if bin_obj: claw.held_toy.y = bin_obj.y + bin_obj.height - 10
+            claw.held_toy = None
 
     def get_drop_offset(self):
-        r = self.config["drop_offset_range"]
-        return random.uniform(-r, r)
+        return random.uniform(-20.0, 20.0)

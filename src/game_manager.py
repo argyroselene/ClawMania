@@ -2,17 +2,23 @@ import pygame
 from src.ui import Button, Slider
 from src.utils import SCREEN_WIDTH, SCREEN_HEIGHT, BLACK, WHITE, get_font, BG_COLOR, TEXT_COLOR, load_image
 from src.machine import Machine
+from src.persistence import PersistenceManager
+from src.map_screen import MapScreen
 
 # Import Levels
 try:
     from src.levels.level1 import Level1
     from src.levels.level2 import Level2
     from src.levels.level3 import Level3
+    from src.levels.level4 import Level4
+    from src.levels.level5 import Level5
 except ImportError:
     # Fallback/Placeholder
     Level1 = None
     Level2 = None
     Level3 = None
+    Level4 = None
+    Level5 = None
 
 class GameManager:
     def __init__(self):
@@ -31,11 +37,16 @@ class GameManager:
         self.machine = None
         
         # Level System
-        self.levels = [Level1, Level2, Level3] # registry
+        self.levels = [Level1, Level2, Level3, Level4, Level5] # registry
         self.current_level_index = 0
 
         # Assets
         self.menu_background = load_image("game_bg.png", SCREEN_WIDTH, SCREEN_HEIGHT) # Load global background
+
+        # Persistence & Map
+        self.persistence = PersistenceManager()
+        self.persistence.load_data()
+        self.map_screen = MapScreen(self.persistence, self)
 
         # UI Elements
         self.init_ui()
@@ -104,9 +115,8 @@ class GameManager:
         if mode == "PRACTICE":
             self.set_state("PRACTICE_PARAMS")
         else:
-            # Start Game Mode Sequence
-            self.current_level_index = 0
-            self.set_state("LEVEL_INTRO")
+            # Start Game Mode Sequence -> Map Screen
+            self.set_state("MAP")
 
     def start_current_level(self):
         index = self.current_level_index
@@ -115,7 +125,8 @@ class GameManager:
             if lvl_class:
                 level_logic = lvl_class()
                 config = level_logic.get_config()
-                self.machine = Machine(config, level_logic=level_logic)
+                # Pass persistence to Machine for XP tracking
+                self.machine = Machine(config, level_logic=level_logic, persistence=self.persistence)
                 self.set_state("GAME")
             else:
                 print("Level class not found.")
@@ -158,6 +169,17 @@ class GameManager:
             self.set_state("GAME")
 
     def update(self):
+        if self.state == "MAP":
+            # Handle Map events/update
+            # Events processed in main loop? GameManager.update usually runs per frame logic
+            # MapScreen might have internal logic
+            self.map_screen.update()
+            
+            # Handle input for map dragging here?
+            # Ideally GameManager passes events or handles inputs globally.
+            # But main.py loop calls handle_event.
+            pass
+
         if self.state == "GAME":
             if self.machine:
                 self.machine.update()
@@ -174,7 +196,9 @@ class GameManager:
                             self.level_transition_timer = 0
                             self.current_level_index += 1
                             if self.current_level_index < len(self.levels):
-                                self.set_state("LEVEL_INTRO")
+                                # Return to Map instead of auto-next for unlock system
+                                self.set_state("MAP")
+                                # self.set_state("LEVEL_INTRO")
                             else:
                                 # All levels done
                                 print("All levels completed!")
@@ -273,6 +297,9 @@ class GameManager:
                 if not self.machine.game_over:
                     self.btn_pause.draw(screen)
 
+        elif self.state == "MAP":
+            self.map_screen.draw(screen)
+
         elif self.state == "PAUSED":
             # Draw game background (machine) halted
             if self.machine:
@@ -326,6 +353,9 @@ class GameManager:
         elif self.state == "PAUSED":
             self.btn_resume.handle_event(event)
             self.btn_home.handle_event(event)
+
+        elif self.state == "MAP":
+            self.map_screen.handle_event(event)
 
     def draw_title(self, screen, text):
         font = get_font(48)

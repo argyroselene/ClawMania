@@ -37,19 +37,23 @@ class Claw:
         self.held_toy = None
 
 
-    def update(self):
+    def update(self, allow_input=True):
         dt = 1/60 # approximation
         
         if self.state == "IDLE":
             keys = pygame.key.get_pressed()
-            if keys[pygame.K_LEFT]:
-                self.x -= self.move_speed
-            if keys[pygame.K_RIGHT]:
-                self.x += self.move_speed
-                
+            if allow_input:
+                if keys[pygame.K_LEFT]:
+                    self.x -= self.move_speed
+                if keys[pygame.K_RIGHT]:
+                    self.x += self.move_speed
+            
             self.x = max(50, min(self.x, SCREEN_WIDTH - 50))
             
-            if keys[pygame.K_SPACE]:
+            # Start Drop - requires aiming active?
+            # "Player must press GRAB before timer hits zero"
+            # So allow_input controls Drop too
+            if allow_input and keys[pygame.K_SPACE]:
                 self.state = "DROPPING"
                 
         elif self.state == "DROPPING":
