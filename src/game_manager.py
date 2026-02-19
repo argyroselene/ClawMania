@@ -16,7 +16,7 @@ except ImportError:
 
 class GameManager:
     def __init__(self):
-        self.state = "MENU" # MENU, MODE_SELECT, PRACTICE_PARAMS, GAME, LEVEL_INTRO
+        self.state = "MENU" # MENU, MODE_SELECT, PRACTICE_PARAMS, GAME, LEVEL_INTRO, PAUSED
         self.mode = None # "PRACTICE" or "GAME"
         # Initial config based on presets
         self.config = {
@@ -89,6 +89,12 @@ class GameManager:
         self.btn_start_custom = Button(center_x - 100, 520, 200, 50, "Start Session", action=self.start_custom_practice)
         self.btn_back_config = Button(10, 10, 100, 40, "Back", action=lambda: self.set_state("PRACTICE_PARAMS"))
 
+        # PAUSE MENU
+        # Moved to bottom right to avoid covering stats (which are top-left)
+        self.btn_pause = Button(SCREEN_WIDTH - 110, SCREEN_HEIGHT - 50, 100, 40, "Pause", action=self.toggle_pause)
+        self.btn_resume = Button(center_x - 100, 250, 200, 50, "Resume", action=self.toggle_pause)
+        self.btn_home = Button(center_x - 100, 320, 200, 50, "Main Menu", action=lambda: self.set_state("MENU"))
+
     def set_state(self, state):
         self.state = state
         print(f"State changed to: {self.state}")
@@ -145,6 +151,12 @@ class GameManager:
         self.mode = "PRACTICE"
         self.set_state("GAME")
 
+    def toggle_pause(self):
+        if self.state == "GAME":
+            self.set_state("PAUSED")
+        elif self.state == "PAUSED":
+            self.set_state("GAME")
+
     def update(self):
         if self.state == "GAME":
             if self.machine:
@@ -174,7 +186,7 @@ class GameManager:
             # Check for back to menu?
             keys = pygame.key.get_pressed()
             if keys[pygame.K_ESCAPE]:
-                self.set_state("MENU")
+                self.toggle_pause() # ESC toggles pause now instead of quitting directly
 
     def draw(self, screen):
         # Draw Background
@@ -256,6 +268,27 @@ class GameManager:
                          # Show "Loading..." or just wait for auto transition
                          wait_surf = get_font(24).render("Proceeding...", True, WHITE)
                          screen.blit(wait_surf, (SCREEN_WIDTH//2 - wait_surf.get_width()//2, SCREEN_HEIGHT//2 + 50))
+                
+                # Draw Pause Button
+                if not self.machine.game_over:
+                    self.btn_pause.draw(screen)
+
+        elif self.state == "PAUSED":
+            # Draw game background (machine) halted
+            if self.machine:
+                self.machine.draw(screen)
+            
+            # Overlay
+            s = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.SRCALPHA)
+            s.fill((0, 0, 0, 150))
+            screen.blit(s, (0, 0))
+            
+            font = get_font(48)
+            pause_surf = font.render("PAUSED", True, WHITE)
+            screen.blit(pause_surf, (SCREEN_WIDTH//2 - pause_surf.get_width()//2, 150))
+            
+            self.btn_resume.draw(screen)
+            self.btn_home.draw(screen)
 
     def handle_event(self, event):
         if self.state == "MENU":
@@ -287,6 +320,12 @@ class GameManager:
             if self.machine and self.machine.game_over:
                 if not self.machine.won:
                     self.btn_menu_lc.handle_event(event)
+            else:
+                 self.btn_pause.handle_event(event)
+
+        elif self.state == "PAUSED":
+            self.btn_resume.handle_event(event)
+            self.btn_home.handle_event(event)
 
     def draw_title(self, screen, text):
         font = get_font(48)
