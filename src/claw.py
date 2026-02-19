@@ -31,7 +31,9 @@ class Claw:
         self.state = "IDLE" # IDLE, MOVING, DROPPING, GRABBING, LIFTING, RETURNING, RELEASING
         self.target_y = y
         self.max_drop_depth = 470 # Adjusted for larger claw height (590 floor - 120 height)
+        self.max_drop_depth = 470 # Adjusted for larger claw height (590 floor - 120 height)
         self.grab_timer = 0
+        self.release_timer = 0
         self.held_toy = None
 
 
@@ -69,17 +71,18 @@ class Claw:
                 self.state = "RETURNING"
                 
         elif self.state == "RETURNING":
-            # Move back to start (left side usually)
-            if self.x > 100:
+            # Move back to start/basket (left side)
+            if self.x > 75:
                 self.x -= self.move_speed
             else:
                 self.state = "RELEASING"
+                self.release_timer = pygame.time.get_ticks()
                 
         elif self.state == "RELEASING":
             # Open claw, drop toy
-            # Apply release offset
-            # held_toy is cleared by Machine.drop_toy()
-            self.state = "IDLE" # Reset
+            # Wait a bit so we see it open
+            if pygame.time.get_ticks() - self.release_timer > 500: # 0.5s
+                self.state = "IDLE" # Reset
 
     def draw(self, screen):
         # Draw Rope (Arm)
@@ -108,8 +111,28 @@ class Claw:
             # self.x is center X.
             screen.blit(image_to_draw, (self.x - self.width//2, self.y))
         else:
-            # Fallback Geometric Drawing
-            rect = pygame.Rect(self.x - self.width//2, self.y, self.width, self.height)
-            pygame.draw.rect(screen, (255, 105, 180), rect)
-            pygame.draw.rect(screen, (0, 255, 255), rect, 2)
+            # Fallback Geometric Drawing (Procedural Wireframe)
+            # Draw Top Bar
+            pygame.draw.rect(screen, (150, 150, 150), (self.x - 20, self.y, 40, 15))
+            
+            # Determine Claw Angle
+            angle = 0 # Open
+            if self.state in ["GRABBING", "LIFTING", "RETURNING"]:
+                angle = 30 # Closed/Inward
+            
+            # Left Pincer
+            start_l = (self.x - 20, self.y + 15)
+            mid_l = (self.x - 20 - (10 if angle==0 else -5), self.y + 60)
+            end_l = (self.x - 10 + (20 if angle > 0 else 0), self.y + 100)
+            
+            pygame.draw.line(screen, (200, 200, 200), start_l, mid_l, 5)
+            pygame.draw.line(screen, (200, 200, 200), mid_l, end_l, 5)
+            
+            # Right Pincer
+            start_r = (self.x + 20, self.y + 15)
+            mid_r = (self.x + 20 + (10 if angle==0 else -5), self.y + 60)
+            end_r = (self.x + 10 - (20 if angle > 0 else 0), self.y + 100)
+            
+            pygame.draw.line(screen, (200, 200, 200), start_r, mid_r, 5)
+            pygame.draw.line(screen, (200, 200, 200), mid_r, end_r, 5)
 

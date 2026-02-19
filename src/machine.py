@@ -3,7 +3,7 @@ import random
 from src.claw import Claw
 from src.bin import Bin
 from src.toy import Toy
-from src.utils import SCREEN_WIDTH, SCREEN_HEIGHT, load_image
+from src.utils import SCREEN_WIDTH, SCREEN_HEIGHT, load_image, get_font, WHITE, BLACK
 
 class Machine:
     def __init__(self, config, level_logic=None):
@@ -71,6 +71,24 @@ class Machine:
         for toy in self.toys:
             toy.update(self.bin.x, bin_velocity)
             
+            # Check for basket collection here
+            if not toy.grabbed and not toy.in_basket:
+                # Basket Rect (Visual)
+                basket_rect = pygame.Rect(10, SCREEN_HEIGHT - 120, 130, 120)
+                # Actual catch zone
+                if basket_rect.colliderect(toy.rect):
+                    # Check if deep enough
+                     # Check if deep enough
+                    if toy.y > SCREEN_HEIGHT - 120 and toy.on_ground:
+                         # print(f"Collected: {toy.size}")
+                         toy.in_basket = True
+                         self.score += toy.points
+                         self.last_result = f"Score! +{toy.points}"
+                         self.show_popup("COLLECTED!")
+                         # Update stats
+                         if self.level_logic and hasattr(self.level_logic, "on_toy_collected"):
+                             self.level_logic.on_toy_collected()
+            
         # 3. Update Claw
         prev_state = self.claw.state
         self.claw.update()
@@ -98,7 +116,17 @@ class Machine:
         # Update held toy position
         if self.claw.held_toy:
             self.claw.held_toy.x = self.claw.x - self.claw.held_toy.width // 2
-            self.claw.held_toy.y = self.claw.y + 10 # Inside the claw
+            # Positioning it "inside" the claw (claw is ~120px tall, so +60 puts it mid-bottom)
+            # Positioning it "inside" the claw (claw is ~120px tall, so +60 puts it mid-bottom)
+            # Add Sway based on claw movement
+            sway = 0
+            if self.claw.state == "RETURNING":
+                sway = 10 # Drag behind slightly
+            elif self.claw.state == "MOVING": # If we had moving state for manual control
+                 pass
+            
+            self.claw.held_toy.x = self.claw.x - self.claw.held_toy.width // 2 + sway
+            self.claw.held_toy.y = self.claw.y + 50 # Moved up slightly to be more "in" the palm
 
         # 5. Level Logic Update (Win/Loss/Slip)
         if self.level_logic:
@@ -118,23 +146,33 @@ class Machine:
             screen.fill((50, 0, 50)) # Fallback color
 
         # Draw Bin
+        # Draw Basket Back (Interior)
+        basket_rect = pygame.Rect(10, SCREEN_HEIGHT - 120, 130, 120)
+        pygame.draw.rect(screen, (100, 50, 10), basket_rect) # Darker interior
+        
         self.bin.draw(screen)
         
-        # Draw Toys (Unheld)
+        # Draw Toys (Unheld first, then held)
         for toy in self.toys:
-            if toy != self.claw.held_toy:
-                toy.draw(screen)
-            
+           if not toy.grabbed:
+               toy.draw(screen)
+
+        # Draw Held Toy (Behind Claw for "Inside" look)
+        if self.claw.held_toy:
+             self.claw.held_toy.draw(screen)
+
         # Draw Claw
         self.claw.draw(screen)
-        
-        # Draw Held Toy (On Top for visibility)
-        if self.claw.held_toy:
-             # Ensure it's positioned correctly for drawing
-             self.claw.held_toy.draw(screen)
+             
+        # Draw Basket Front (Rim)
+        pygame.draw.rect(screen, (160, 82, 45), basket_rect, 5) # Lighter border
+        # Label
+        b_font = get_font(20)
+        b_text = b_font.render("PRIZES", True, (255, 220, 180))
+        screen.blit(b_text, (basket_rect.centerx - b_text.get_width()//2, basket_rect.y + 10))
         
         # Draw HUD (Score)
-        from src.utils import get_font, WHITE, BLACK
+        # from src.utils import get_font, WHITE, BLACK # Removed local import
         font = get_font(24)
         score_surf = font.render(f"Score: {self.score}", False, WHITE)
         screen.blit(score_surf, (SCREEN_WIDTH - 150, 10))
@@ -142,7 +180,8 @@ class Machine:
         # Level Stats HUD (Top Left)
         if self.level_logic and hasattr(self.level_logic, 'toys_collected'):
              # Toys Collected
-             toys_str = f"Toys: {self.level_logic.toys_collected}/{self.level_logic.toys_needed}"
+             toys_remaining = max(0, self.level_logic.toys_needed - self.level_logic.toys_collected)
+             toys_str = f"Toys Left: {toys_remaining}"
              toys_surf = font.render(toys_str, False, (0, 255, 255))
              screen.blit(toys_surf, (20, 10))
              
@@ -199,24 +238,7 @@ class Machine:
             
             self.claw.held_toy.x += offset
             self.claw.held_toy.grabbed = False
-            
-            # Check if it landed in the chute (e.g., left side < 100)
-            if self.claw.held_toy.x < 100:
-                self.score += self.claw.held_toy.points
-                self.last_result = f"Score! +{self.claw.held_toy.points}"
-                
-                # Notify Level Logic if exists
-                if self.level_logic and hasattr(self.level_logic, "on_toy_collected"):
-                    self.level_logic.on_toy_collected()
-                    
-                # Remove toy or respawn?
-                self.toys.remove(self.claw.held_toy)
-                self.show_popup("COLLECTED!")
-            else:
-                self.last_result = "Dropped Outside"
-                # Return to bin Y
-                self.claw.held_toy.y = self.bin.y + self.bin.height - 10
-            
+            # Ensure gravity takes over
             self.claw.held_toy = None
 
     def attempt_grab(self):
@@ -264,16 +286,19 @@ class Machine:
              self.show_popup("MISSED!")
 
     def check_slip(self):
-        # Default Practice Mode Slip
-        if random.random() < 0.05: 
-            G = self.config.get("grip_strength", 0.8)
-            T = self.claw.held_toy.difficulty_factor
-            L = self.config.get("slip_chance", 0.1) * 5 
-            P_slip = (1.0 - G) * T * L
-            
-            if random.random() < P_slip:
-                print(f"Slipped! P_slip={P_slip:.2f}")
+        # Called every frame during LIFTING/RETURNING
+        # Small chance to slip per frame
+        if random.random() < 0.01: # 1% chance per frame to slip
+             # Can calculate based on grip strength
+             G = self.config.get("grip_strength", 0.8)
+             # Higher grip = lower slip chance
+             chance = 0.02 * (1.0 - G)
+             
+             if random.random() < chance:
+                print(f"Slipped!")
                 self.claw.held_toy.grabbed = False
-                self.claw.held_toy.y = self.bin.y + self.bin.height - 10 
+                # Add some horizontal velocity on slip
+                self.claw.held_toy.vx = random.uniform(-2, 2)
+                # Gravity will take it down
                 self.claw.held_toy = None
                 self.show_popup("SLIPPED!")

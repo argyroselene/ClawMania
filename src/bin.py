@@ -13,7 +13,8 @@ class Bin:
         self.border_color = NEON_GREEN
         
         # Bounds for movement
-        self.min_x = 50
+        # Increased min_x to 150 to make room for the basket on the left
+        self.min_x = 150
         self.max_x = SCREEN_WIDTH - 50 - width
 
     def update(self):
