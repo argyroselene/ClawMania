@@ -20,7 +20,6 @@ The project is designed as a **discrete-time stochastic simulation**, allowing e
 ### 🎯 Gameplay
 ![Gameplay Screenshot](screenshots/gameplay.png)
 
-> Place your images inside a folder named `screenshots` in your project directory.
 
 ---
 
