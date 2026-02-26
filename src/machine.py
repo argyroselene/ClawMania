@@ -47,10 +47,7 @@ class Machine:
         if self.level_logic:
              # Level specific timer values
              level_name = self.level_logic.config.get("name", "")
-             # L1=12, L2=9, L3=7, L4=5, L5=4
-             # Map based on level index or config? 
-             # Let's assume passed in config or derived. 
-             # Since I don't have level index here easily, I'll rely on config or level_logic property
+             
              if hasattr(self.level_logic, "config") and "control_time" in self.level_logic.config:
                  self.time_limit = self.level_logic.config["control_time"]
              else:
@@ -60,10 +57,7 @@ class Machine:
                  elif "Level 3" in level_name: self.time_limit = 7.0
                  # etc.
         
-        # Initial State: Frozen until Start pressed
-        # Except Practice Mode?
-        # User requested: "Player presses START -> Timer begins"
-        # So we start IDLE but "Frozen".
+       
         
         # Popup Feedback
         self.popup_message = None
@@ -131,35 +125,17 @@ class Machine:
              if self.attempt_timer <= 0:
                  self.fail_attempt()
         
-        # Restrict Claw Movement if not active
-        # Handled by disabling input in Claw or overwriting x?
-        # Better: Claw updates based on keys. If we want to freeze it, we should control it here.
-        # But Claw reads keys internally. 
-        # I will modify Claw to accept "can_move" flag or overwrite its position if frozen.
-        # Actually, simpler: Only call self.claw.update() if active? 
-        # No, update handles state transitions (DROPPING etc).
-        # We should only prevent MOVING (Left/Right) if not active.
-        # Let's override claw.process_input? Or rely on a flag in Claw.
-        # For now, let's inject a flag into Claw if possible. 
-        # Or just hack it: save x, update, restore x if not allowed.
+        
         
         # Check if user tries to move without Start
         if not self.attempt_active and self.claw.state == "IDLE":
-             # Force IDLE and prevent X change
-             # Ideally we modify Claw class. But for now:
+             
              pass 
-             # Actually, if I don't modify Claw, user can move it.
-             # User says "Player must press GRAB before timer hits zero".
-             # "Stop when grab is triggered".
+             
              
         self.claw.update(allow_input=self.attempt_active) # I'll add allow_input to Claw.update
         
-        # Check for turn completion (Return to IDLE from non-IDLE)
-        # We need to know if we just finished a cycle.
-        # Simple check: if attempt_active is True, but Claw is IDLE (and not at start of turn)
-        # But wait, start of turn IS IDLE.
-        # We need a flag "attempt_started_moving"?
-        # Or check if prev_state was NOT IDLE and now IS IDLE.
+        
         if prev_state != "IDLE" and self.claw.state == "IDLE":
             if self.attempt_active:
                 self.attempt_active = False # Reset for next turn
@@ -169,14 +145,10 @@ class Machine:
         # STATE CHANGE: GRABBING -> LIFTING (The moment of grab attempt)
         if prev_state == "GRABBING" and self.claw.state == "LIFTING":
             self.attempt_grab()
-            
-        # STATE: LIFTING/RETURNING (Check for slip)
-        # If level logic exists, it might handle slip internally in its update method
-        # But we also have a dedicated check_slip here for legacy/practice.
-        # Let's delegate if level_logic exists, otherwise use default.
+        
         if self.level_logic:
-             pass # Logic handled in level_logic.update() usually, or we call it explicitly?
-             # Actually, Level1.update handles slip. So we skip default check_slip.
+             pass # Logic handled in level_logic.update() usually
+             
         elif self.claw.state in ["LIFTING", "RETURNING"] and self.claw.held_toy:
             self.check_slip()
             
@@ -187,9 +159,7 @@ class Machine:
         # Update held toy position
         if self.claw.held_toy:
             self.claw.held_toy.x = self.claw.x - self.claw.held_toy.width // 2
-            # Positioning it "inside" the claw (claw is ~120px tall, so +60 puts it mid-bottom)
-            # Positioning it "inside" the claw (claw is ~120px tall, so +60 puts it mid-bottom)
-            # Add Sway based on claw movement
+            
             sway = 0
             if self.claw.state == "RETURNING":
                 sway = 10 # Drag behind slightly
@@ -318,9 +288,7 @@ class Machine:
                  lbl = s_font.render("START", True, WHITE)
                  screen.blit(lbl, (btn_rect.centerx - lbl.get_width()//2, btn_rect.centery - lbl.get_height()//2))
                  
-                 # Check click? Machine logic usually doesn't handle events directly.
-                 # But we can check mouse state here if we want or rely on GameManager passing events.
-                 # Better: auto-detect click in update? Or just check mouse for now.
+                 
                  if pygame.mouse.get_pressed()[0]:
                      mx, my = pygame.mouse.get_pos()
                      if btn_rect.collidepoint(mx, my):
@@ -332,8 +300,7 @@ class Machine:
 
     def drop_toy(self):
         if self.claw.held_toy:
-            # Drop it
-            # Apply release offset
+            
             
             offset = 0.0
             if self.level_logic:
@@ -359,9 +326,7 @@ class Machine:
                 self.show_popup("MISSED!")
             return
 
-        # Default Practice Mode Logic
-        # ... (Legacy logic simplification for brevity or update?)
-        # Let's keep legacy but update feedback
+        
         closest_toy = None
         min_dist = 999
         claw_center_x = self.claw.x
@@ -393,9 +358,8 @@ class Machine:
              self.show_popup("MISSED!")
 
     def check_slip(self):
-        # Called every frame during LIFTING/RETURNING
-        # Small chance to slip per frame
-        if random.random() < 0.01: # 1% chance per frame to slip
+        
+        if random.random() < 0.01: 
              # Can calculate based on grip strength
              G = self.config.get("grip_strength", 0.8)
              # Higher grip = lower slip chance

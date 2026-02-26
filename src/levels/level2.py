@@ -3,6 +3,9 @@ import random
 class Level2:
     """
     Level 2: Simple Collection (3 toys, 5 chances)
+    Now uses NORMAL distribution for:
+    - Grip Strength
+    - Drop Offset
     """
     def __init__(self):
         self.config = {
@@ -51,81 +54,90 @@ class Level2:
         # --- SLIP CHECK ---
         if claw.state in ["LIFTING", "RETURNING"] and claw.held_toy and not self.slip_checked:
             if self.check_slip():
-                # Apply slip
                 claw.held_toy.grabbed = False
-                # Reset position to bin (approximate)
                 claw.held_toy.y = bin_obj.y + bin_obj.height - 10
                 claw.held_toy = None
                 
                 self.message = "Slipped!"
             self.slip_checked = True
 
-        # --- DETECT ATTEMPT END (Cycle Complete) ---
+        # --- DETECT ATTEMPT END ---
         if self.active_attempt and claw.state == "IDLE":
-             self.attempts_used += 1
-             self.active_attempt = False
+            self.attempts_used += 1
+            self.active_attempt = False
 
-        # Status HUD Message
+        # HUD Message
         if not self.message:
             status["message"] = f"Toys: {self.toys_collected}/{self.toys_needed} | Chances: {self.max_attempts - self.attempts_used}"
         else:
             status["message"] = self.message
 
-        # Reset transient feedback (except for game over checks)
-        # Note: We keep self.message for one update cycle to let Machine catch it
-        # Actually, self.message might be better handled if we reset it AFTER status is returned or next frame
-        # But for now, let's just make sure it's returned.
-        curr_msg = self.message
-        self.message = "" # Reset for next frame
+        # Reset transient feedback
+        self.message = ""
         self.last_score_awarded = 0
 
-        # Win/Loss Conditions
+        # Win/Loss
         if self.toys_collected >= self.toys_needed:
             status["game_over"] = True
             status["success"] = True
             status["message"] = "Level Cleared!"
         elif self.attempts_used >= self.max_attempts and claw.state == "IDLE":
-             status["game_over"] = True
-             status["success"] = False
-             status["message"] = "Out of Attempts!"
+            status["game_over"] = True
+            status["success"] = False
+            status["message"] = "Out of Attempts!"
 
         return status
 
-    def on_toy_collected(self):
-        # Simple Scoring
-        score = 100 
-        
-        # Update State
-        self.toys_collected += 1
-        self.level_score += score
-        self.last_score_awarded = score
-        self.message = f"Score! +{score}"
+    
+    def grip_success(self):
+        mean = self.config["grip_strength"]
+        std = 0.1  # Balanced variation
+
+        grip_value = random.gauss(mean, std)
+
+        # Clamp between 0 and 1
+        grip_value = max(0.0, min(1.0, grip_value))
+
+        return random.random() <= grip_value
 
     def resolve_grab(self, claw_rect, toys):
-        # Attempts are now tracked in update() cycle end
-        
         cx, cy, cw, ch = claw_rect
+
         for toy in toys:
             if toy.grabbed:
                 continue
             
-            # AABB collision check
             toy_left = toy.x
-            # toy.y is the floor, height is up. Rect is (x, y-h, w, h)
             toy_top = toy.y - toy.height
             
             if (cx < toy_left + toy.width and cx + cw > toy_left and
                 cy < toy.y and cy + ch > toy_top):
                 
-                # Grip strength check
-                if random.random() <= float(self.config["grip_strength"]):
+                if self.grip_success():
                     toy.grabbed = True
                     return toy
+
         return None
+
 
     def check_slip(self):
         return random.random() < self.config["slip_probability"]
 
     def get_drop_offset(self):
         r = self.config["drop_offset_range"]
-        return random.uniform(-r, r)
+
+        # 99% of values within range
+        offset = random.gauss(0, r / 3)
+
+        # Clamp to range
+        offset = max(-r, min(r, offset))
+
+        return offset
+
+
+    def on_toy_collected(self):
+        score = 100 
+        self.toys_collected += 1
+        self.level_score += score
+        self.last_score_awarded = score
+        self.message = f"Score! +{score}"

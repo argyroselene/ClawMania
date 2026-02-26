@@ -48,3 +48,11 @@ def load_image(filename, width=None, height=None):
     except Exception as e:
         print(f"Failed to load image {filename}: {e}")
         return None
+def play_bg_music(filename, volume=0.5):
+    try:
+        path = get_asset_path("sounds", filename)
+        pygame.mixer.music.load(path)
+        pygame.mixer.music.set_volume(volume)
+        pygame.mixer.music.play(-1) # Loop indefinitely
+    except Exception as e:
+        print(f"Failed to play music {filename}: {e}")

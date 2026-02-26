@@ -1,8 +1,9 @@
 {
-    "xp": 100,
+    "xp": 690,
     "unlocked_levels": [
         0,
-        1
+        1,
+        2
     ],
     "current_level": 0
 }

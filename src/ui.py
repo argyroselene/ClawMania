@@ -5,7 +5,7 @@ class Button:
     # Class-level cache for images to avoid reloading for every button
     img_normal = None
     
-    def __init__(self, x, y, width, height, text, action=None, color=UI_BG_COLOR, hover_color=HOT_PINK, text_color=TEXT_COLOR):
+    def __init__(self, x, y, width, height, text, action=None, color=UI_BG_COLOR, hover_color=HOT_PINK, text_color=DEEP_PURPLE):
         self.rect = pygame.Rect(x, y, width, height)
         self.text = text
         self.action = action
@@ -13,7 +13,7 @@ class Button:
         self.hover_color = hover_color
         self.text_color = text_color
         self.font = get_font(24)
-        self.border_color = CYAN
+        self.border_color = DEEP_PURPLE
         
         if Button.img_normal is None:
             Button.img_normal = load_image("btn_normal.png")
@@ -50,14 +50,15 @@ class Button:
                 self.action()
 
 class Slider:
-    def __init__(self, x, y, width, min_val, max_val, initial_val, label):
-        self.rect = pygame.Rect(x, y, width, 20)
+    def __init__(self, x, y, width, min_val, max_val, initial_val, label, font_size=20):
+        self.rect = pygame.Rect(x, y, width, 18) # Slightly thicker track for bigger font
         self.min_val = min_val
         self.max_val = max_val
         self.value = initial_val
         self.label = label
+        self.font_size = font_size
         self.dragging = False
-        self.handle_rect = pygame.Rect(x, y - 5, 20, 30) # Wider handle
+        self.handle_rect = pygame.Rect(x, y - 6, 20, 30) # Bigger handle for better UX
         self.update_handle_pos()
 
     def update_handle_pos(self):
@@ -66,9 +67,9 @@ class Slider:
 
     def draw(self, screen):
         # Draw label
-        font = get_font(20)
-        label_surf = font.render(f"{self.label}: {self.value:.2f}", False, CYAN)
-        screen.blit(label_surf, (self.rect.x, self.rect.y - 25))
+        font = get_font(self.font_size)
+        label_surf = font.render(f"{self.label}: {self.value:.2f}", False, DEEP_PURPLE)
+        screen.blit(label_surf, (self.rect.x, self.rect.y - self.font_size - 10))
         
         # Draw track
         pygame.draw.rect(screen, UI_BG_COLOR, self.rect)

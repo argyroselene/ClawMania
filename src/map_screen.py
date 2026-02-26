@@ -1,15 +1,31 @@
 import pygame
 from src.utils import SCREEN_WIDTH, SCREEN_HEIGHT, get_font, BLACK, WHITE, TEXT_COLOR
+from src.ui import Button
 
 class MapScreen:
     def __init__(self, persistence, game_manager):
         self.persistence = persistence
         self.game_manager = game_manager
         
+        # Load Background Image
+        from src.utils import load_image
+        self.bg_image = load_image("map.png")
+        if self.bg_image:
+            
+            bg_rect = self.bg_image.get_rect()
+            self.bg_width = bg_rect.width
+            
+            if bg_rect.height != SCREEN_HEIGHT:
+                scale_factor = SCREEN_HEIGHT / bg_rect.height
+                self.bg_width = int(bg_rect.width * scale_factor)
+                self.bg_image = pygame.transform.scale(self.bg_image, (self.bg_width, SCREEN_HEIGHT))
+        else:
+            self.bg_width = 2000 # Fallback width
+            
         self.scroll_x = 0
         self.max_scroll = 0
-        self.min_scroll = - (5 * 250 - SCREEN_WIDTH + 100) # Assuming 5 levels, 250px spacing
-        if self.min_scroll > 0: self.min_scroll = 0 # Don't scroll if content fits
+        self.min_scroll = - (self.bg_width - SCREEN_WIDTH)
+        if self.min_scroll > 0: self.min_scroll = 0
         
         self.dragging = False
         self.last_mouse_x = 0
@@ -28,10 +44,12 @@ class MapScreen:
             {"index": 4, "cost": 500, "pos": (0, 0)}, # Level 5
         ]
         
-        # Calculate positions locally but apply scroll on draw/click
-        pass
+        # Navigation
+        self.btn_back = Button(20, SCREEN_HEIGHT - 70, 120, 50, "Back", action=lambda: self.game_manager.set_state("MENU"))
 
     def handle_event(self, event):
+        self.btn_back.handle_event(event)
+        
         if event.type == pygame.MOUSEBUTTONDOWN:
             if event.button == 1:
                 self.dragging = True
@@ -90,15 +108,24 @@ class MapScreen:
         pass
 
     def draw(self, screen):
-        screen.fill((30, 30, 40)) # Dark map bg
+        if self.bg_image:
+            screen.blit(self.bg_image, (self.scroll_x, 0))
+        else:
+            screen.fill((30, 30, 40)) # Dark map bg fallback
         
         # Draw Title
         title = get_font(40).render("World Map", True, WHITE)
+        # Add shadow for readability against image
+        shadow = get_font(40).render("World Map", True, BLACK)
+        screen.blit(shadow, (22, 22))
         screen.blit(title, (20, 20))
         
         # Draw XP
         xp = self.persistence.get_xp()
         c_surf = get_font(30).render(f"XP: {xp}", True, (0, 255, 255)) # Cyan for XP
+        # Shadow for XP
+        xp_shadow = get_font(30).render(f"XP: {xp}", True, BLACK)
+        screen.blit(xp_shadow, (SCREEN_WIDTH - 198, 22))
         screen.blit(c_surf, (SCREEN_WIDTH - 200, 20))
         
         # Draw Connecting Lines first
@@ -143,7 +170,10 @@ class MapScreen:
                 pygame.draw.rect(screen, (50, 50, 50), rect)
                 pygame.draw.arc(screen, (50, 50, 50), (x - 7, y - 10, 14, 15), 0, 3.14, 2)
                 
-                # Cost below
+                # Cost
                 c_font = get_font(18)
                 cost_txt = c_font.render(f"{level['cost']} XP", True, (0, 255, 255))
                 screen.blit(cost_txt, (x - cost_txt.get_width()//2, y + 50))
+
+        # UI
+        self.btn_back.draw(screen)

@@ -1,6 +1,6 @@
 import pygame
 from src.ui import Button, Slider
-from src.utils import SCREEN_WIDTH, SCREEN_HEIGHT, BLACK, WHITE, get_font, BG_COLOR, TEXT_COLOR, load_image
+from src.utils import SCREEN_WIDTH, SCREEN_HEIGHT, BLACK, WHITE, get_font, BG_COLOR, TEXT_COLOR, load_image, play_bg_music
 from src.machine import Machine
 from src.persistence import PersistenceManager
 from src.map_screen import MapScreen
@@ -42,11 +42,15 @@ class GameManager:
 
         # Assets
         self.menu_background = load_image("game_bg.png", SCREEN_WIDTH, SCREEN_HEIGHT) # Load global background
+        self.practice_background = load_image("practicepage.png", SCREEN_WIDTH, SCREEN_HEIGHT) # Load practice background
 
         # Persistence & Map
         self.persistence = PersistenceManager()
         self.persistence.load_data()
         self.map_screen = MapScreen(self.persistence, self)
+
+        # Background Music
+        play_bg_music("simu.mpeg")
 
         # UI Elements
         self.init_ui()
@@ -69,14 +73,7 @@ class GameManager:
 
         # LEVEL COMPLETE / GAME OVER UI
         self.btn_menu_lc = Button(center_x - 100, 370, 200, 50, "Main Menu", action=lambda: self.set_state("MENU"))
-        # Next level button removed for auto progression, or we can use it on the "Win" screen to confirm proceeding?
-        # Requirement: "after completing it will automaticallly go to level 2"
-        # Let's interpret "automatically" as transition to Level 2 Intro.
-        # But we probably want a "Next Level" button on the win screen so the player can see their score first.
-        # Wait, user said "automaticallly go to level 2". Let's show "Level Complete", wait 2 seconds, then go to Level 2 Intro?
-        # Or just a "Next" button is safer for UX.
-        # User: "automaticallly go to level 2 else it will show game over"
-        # I will make it: Win Screen -> Timer (2s) -> Next Level Intro.
+        
         
         self.level_transition_timer = 0
 
@@ -86,18 +83,19 @@ class GameManager:
         self.btn_back_mode = Button(center_x - 100, 340, 200, 50, "Back", action=lambda: self.set_state("MODE_SELECT"))
 
         # PRACTICE CUSTOM CONFIG SLIDERS (Full set)
-        start_y = 100
-        gap = 70
+        start_y = 130
+        gap = 60 # Reduced from 75 for smaller font
+        s_width = 300
         self.sliders = [
-            Slider(center_x - 150, start_y, 300, 0.0, 1.0, 0.8, "Grip Strength"),
-            Slider(center_x - 150, start_y + gap, 300, 1.0, 10.0, 5.0, "Lift Speed"),
-            Slider(center_x - 150, start_y + gap*2, 300, 0.0, 1.0, 0.1, "Slip Chance"),
-            Slider(center_x - 150, start_y + gap*3, 300, 0.0, 2.0, 0.5, "Drop Delay (s)"),
-            Slider(center_x - 150, start_y + gap*4, 300, 0.0, 50.0, 5.0, "Release Offset"),
-            Slider(center_x - 150, start_y + gap*5, 300, 0.0, 10.0, 0.0, "Bin Speed")
+            Slider(center_x - s_width//2, start_y, s_width, 0.0, 1.0, 0.8, "Grip Strength", font_size=18),
+            Slider(center_x - s_width//2, start_y + gap, s_width, 1.0, 10.0, 5.0, "Lift Speed", font_size=18),
+            Slider(center_x - s_width//2, start_y + gap*2, s_width, 0.0, 1.0, 0.1, "Slip Chance", font_size=18),
+            Slider(center_x - s_width//2, start_y + gap*3, s_width, 0.0, 2.0, 0.5, "Drop Delay (s)", font_size=18),
+            Slider(center_x - s_width//2, start_y + gap*4, s_width, 0.0, 50.0, 5.0, "Release Offset", font_size=18),
+            Slider(center_x - s_width//2, start_y + gap*5, s_width, 0.0, 10.0, 0.0, "Bin Speed", font_size=18)
         ]
         
-        self.btn_start_custom = Button(center_x - 100, 520, 200, 50, "Start Session", action=self.start_custom_practice)
+        self.btn_start_custom = Button(center_x - 100, 480, 200, 50, "Start Session", action=self.start_custom_practice)
         self.btn_back_config = Button(10, 10, 100, 40, "Back", action=lambda: self.set_state("PRACTICE_PARAMS"))
 
         # PAUSE MENU
@@ -170,14 +168,9 @@ class GameManager:
 
     def update(self):
         if self.state == "MAP":
-            # Handle Map events/update
-            # Events processed in main loop? GameManager.update usually runs per frame logic
-            # MapScreen might have internal logic
+            
             self.map_screen.update()
             
-            # Handle input for map dragging here?
-            # Ideally GameManager passes events or handles inputs globally.
-            # But main.py loop calls handle_event.
             pass
 
         if self.state == "GAME":
@@ -214,7 +207,9 @@ class GameManager:
 
     def draw(self, screen):
         # Draw Background
-        if self.menu_background and self.state != "GAME":
+        if self.state == "PRACTICE_CONFIG_CUSTOM" and self.practice_background:
+             screen.blit(self.practice_background, (0, 0))
+        elif self.menu_background and self.state != "GAME":
              screen.blit(self.menu_background, (0, 0))
         elif self.state != "GAME":
              screen.fill(BG_COLOR)
@@ -259,10 +254,6 @@ class GameManager:
             self.btn_back_mode.draw(screen)
 
         elif self.state == "PRACTICE_CONFIG_CUSTOM":
-            font = get_font(32)
-            title_surf = font.render("Custom Settings", False, TEXT_COLOR)
-            screen.blit(title_surf, (SCREEN_WIDTH//2 - 100, 40))
-            
             for slider in self.sliders:
                 slider.draw(screen)
             self.btn_start_custom.draw(screen)

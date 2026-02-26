@@ -50,9 +50,7 @@ class Claw:
             
             self.x = max(50, min(self.x, SCREEN_WIDTH - 50))
             
-            # Start Drop - requires aiming active?
-            # "Player must press GRAB before timer hits zero"
-            # So allow_input controls Drop too
+            
             if allow_input and keys[pygame.K_SPACE]:
                 self.state = "DROPPING"
                 
@@ -91,10 +89,7 @@ class Claw:
     def draw(self, screen):
         # Draw Rope (Arm)
         if self.img_arm:
-            # Stretch or tile? Let's just draw a line for now if image is missing, 
-            # or stretch the image to the current length.
-            # Arm goes from (self.x, 0) to (self.x, self.y)
-            # Center the arm image on self.x
+           
             arm_height = max(1, self.y)
             # Scale simply for now
             scaled_arm = pygame.transform.scale(self.img_arm, (self.img_arm.get_width(), int(arm_height)))
@@ -110,13 +105,10 @@ class Claw:
                 image_to_draw = self.img_closed
         
         if image_to_draw:
-            # Image is already scaled to width/height
-            # Draw centered on x, and top at y
-            # self.x is center X.
+            
             screen.blit(image_to_draw, (self.x - self.width//2, self.y))
         else:
-            # Fallback Geometric Drawing (Procedural Wireframe)
-            # Draw Top Bar
+            
             pygame.draw.rect(screen, (150, 150, 150), (self.x - 20, self.y, 40, 15))
             
             # Determine Claw Angle
