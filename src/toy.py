@@ -9,6 +9,10 @@ class Toy:
         self.base_y = y # To return to if dropped
         self.size = size
         self.grabbed = False
+        self.vy = 0 # Vertical velocity
+        self.vx = 0
+        self.in_basket = False
+        self.on_ground = False
         
         # Properties based on size
         if size == "small":
@@ -38,11 +42,58 @@ class Toy:
         self.rect = pygame.Rect(x, y - self.height, self.width, self.height)
 
     def update(self, bin_x, bin_velocity):
-        if not self.grabbed:
-            # Move with the bin
-            self.x += bin_velocity
-            self.rect.x = self.x
-            self.rect.y = self.y - self.height
+        if self.grabbed:
+            self.vy = 0
+            self.vx = 0
+            self.on_ground = False
+        elif self.in_basket:
+            # Settle in basket
+            self.vy = 0
+            self.vx = 0
+            self.on_ground = True
+        else:
+            # Physics!
+            # If on ground (in bin), move with bin
+            # If in air, gravity
+            
+            # Ground Check
+            # Ground is bin floor usually
+            
+            # Simple gravity
+            self.vy += 0.5 # Gravity
+            self.y += self.vy
+            self.x += self.vx
+            
+            # Check collisions
+            # 1. Bin Floor
+            # Ideally we pass bin rect/basket rect, but for now simple y check
+            # Bin floor y is ~ bin.y + bin.height - 10 (from init logic)
+            # We need to know where the bin is. 
+            # bin_x is passed in.
+            
+            ground_y = 600 - 10 # Screen height - padding? Machine.init says bin_y = SCREEN_HEIGHT - 100.
+            # So bin floor is SCREEN_HEIGHT - 10.
+            
+            # If inside bin x-range
+            # Let's approximate bin floor Y
+            floor_y = 590 
+            
+            if self.y + self.height >= floor_y:
+                self.y = floor_y - self.height
+                self.vy = 0
+                self.on_ground = True
+                
+                # Friction/Bin Movement
+                # If in bin x range
+                # For now just stop falling
+                # Move with bin if on ground?
+                # We need to receive bin velocity for friction
+                self.x += bin_velocity # Friction?
+            else:
+                 self.on_ground = False
+
+        self.rect.x = self.x
+        self.rect.y = self.y
 
     def draw(self, screen):
         # Construct the absolute path to the image

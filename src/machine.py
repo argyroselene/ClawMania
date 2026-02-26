@@ -3,12 +3,13 @@ import random
 from src.claw import Claw
 from src.bin import Bin
 from src.toy import Toy
-from src.utils import SCREEN_WIDTH, SCREEN_HEIGHT, load_image
+from src.utils import SCREEN_WIDTH, SCREEN_HEIGHT, load_image, get_font, WHITE, BLACK
 
 class Machine:
-    def __init__(self, config, level_logic=None):
+    def __init__(self, config, level_logic=None, persistence=None):
         self.config = config
         self.level_logic = level_logic
+        self.persistence = persistence
         
         # Load Background
         self.background = load_image("background.png", SCREEN_WIDTH, SCREEN_HEIGHT)
@@ -38,6 +39,31 @@ class Machine:
         self.score = 0
         self.game_over = False
         self.won = False
+        
+        # Timer System
+        self.attempt_active = False # True when "START" pressed, False when IDLE/Frozen
+        self.attempt_timer = 0.0
+        self.time_limit = 10.0 # Default fallback
+        if self.level_logic:
+             # Level specific timer values
+             level_name = self.level_logic.config.get("name", "")
+             # L1=12, L2=9, L3=7, L4=5, L5=4
+             # Map based on level index or config? 
+             # Let's assume passed in config or derived. 
+             # Since I don't have level index here easily, I'll rely on config or level_logic property
+             if hasattr(self.level_logic, "config") and "control_time" in self.level_logic.config:
+                 self.time_limit = self.level_logic.config["control_time"]
+             else:
+                 # Fallback logic based on name?
+                 if "Level 1" in level_name: self.time_limit = 12.0
+                 elif "Level 2" in level_name: self.time_limit = 9.0
+                 elif "Level 3" in level_name: self.time_limit = 7.0
+                 # etc.
+        
+        # Initial State: Frozen until Start pressed
+        # Except Practice Mode?
+        # User requested: "Player presses START -> Timer begins"
+        # So we start IDLE but "Frozen".
         
         # Popup Feedback
         self.popup_message = None
@@ -71,9 +97,72 @@ class Machine:
         for toy in self.toys:
             toy.update(self.bin.x, bin_velocity)
             
+            # Check for basket collection here
+            if not toy.grabbed and not toy.in_basket:
+                # Basket Rect (Visual)
+                basket_rect = pygame.Rect(10, SCREEN_HEIGHT - 120, 130, 120)
+                # Actual catch zone
+                if basket_rect.colliderect(toy.rect):
+                    # Check if deep enough
+                     # Check if deep enough
+                    if toy.y > SCREEN_HEIGHT - 120 and toy.on_ground:
+                         # print(f"Collected: {toy.size}")
+                         toy.in_basket = True
+                         self.score += toy.points
+                         self.last_result = f"Score! +{toy.points}"
+                         self.show_popup("COLLECTED!")
+                         
+                         # Coin Reward
+                         if self.persistence:
+                             self.persistence.add_xp(toy.points) # XP = Score
+                             self.show_popup(f"COLLECTED! +{toy.points} XP")
+                             
+                         # Update stats
+                         if self.level_logic and hasattr(self.level_logic, "on_toy_collected"):
+                             self.level_logic.on_toy_collected()
+            
+        # 3. Update Claw
         # 3. Update Claw
         prev_state = self.claw.state
-        self.claw.update()
+        
+        # Timer Logic
+        if self.attempt_active and self.claw.state == "IDLE":
+             self.attempt_timer -= dt
+             if self.attempt_timer <= 0:
+                 self.fail_attempt()
+        
+        # Restrict Claw Movement if not active
+        # Handled by disabling input in Claw or overwriting x?
+        # Better: Claw updates based on keys. If we want to freeze it, we should control it here.
+        # But Claw reads keys internally. 
+        # I will modify Claw to accept "can_move" flag or overwrite its position if frozen.
+        # Actually, simpler: Only call self.claw.update() if active? 
+        # No, update handles state transitions (DROPPING etc).
+        # We should only prevent MOVING (Left/Right) if not active.
+        # Let's override claw.process_input? Or rely on a flag in Claw.
+        # For now, let's inject a flag into Claw if possible. 
+        # Or just hack it: save x, update, restore x if not allowed.
+        
+        # Check if user tries to move without Start
+        if not self.attempt_active and self.claw.state == "IDLE":
+             # Force IDLE and prevent X change
+             # Ideally we modify Claw class. But for now:
+             pass 
+             # Actually, if I don't modify Claw, user can move it.
+             # User says "Player must press GRAB before timer hits zero".
+             # "Stop when grab is triggered".
+             
+        self.claw.update(allow_input=self.attempt_active) # I'll add allow_input to Claw.update
+        
+        # Check for turn completion (Return to IDLE from non-IDLE)
+        # We need to know if we just finished a cycle.
+        # Simple check: if attempt_active is True, but Claw is IDLE (and not at start of turn)
+        # But wait, start of turn IS IDLE.
+        # We need a flag "attempt_started_moving"?
+        # Or check if prev_state was NOT IDLE and now IS IDLE.
+        if prev_state != "IDLE" and self.claw.state == "IDLE":
+            if self.attempt_active:
+                self.attempt_active = False # Reset for next turn
         
         # 4. Check Interactions
         
@@ -98,14 +187,27 @@ class Machine:
         # Update held toy position
         if self.claw.held_toy:
             self.claw.held_toy.x = self.claw.x - self.claw.held_toy.width // 2
-            self.claw.held_toy.y = self.claw.y + 10 # Inside the claw
+            # Positioning it "inside" the claw (claw is ~120px tall, so +60 puts it mid-bottom)
+            # Positioning it "inside" the claw (claw is ~120px tall, so +60 puts it mid-bottom)
+            # Add Sway based on claw movement
+            sway = 0
+            if self.claw.state == "RETURNING":
+                sway = 10 # Drag behind slightly
+            elif self.claw.state == "MOVING": # If we had moving state for manual control
+                 pass
+            
+            self.claw.held_toy.x = self.claw.x - self.claw.held_toy.width // 2 + sway
+            self.claw.held_toy.y = self.claw.y + 50 # Moved up slightly to be more "in" the palm
 
         # 5. Level Logic Update (Win/Loss/Slip)
-        if self.level_logic:
+        if self.level_logic and not self.game_over:
             status = self.level_logic.update(dt, self.claw, self.toys, self.bin)
             if status["game_over"]:
                 self.game_over = True
                 self.won = status["success"]
+                if self.won and self.persistence:
+                    self.persistence.add_xp(50) # Level bonus
+                    status["message"] += " +50 XP!"
                 self.last_result = status["message"]
             elif status["message"]:
                  self.last_result = status["message"]
@@ -118,23 +220,33 @@ class Machine:
             screen.fill((50, 0, 50)) # Fallback color
 
         # Draw Bin
+        # Draw Basket Back (Interior)
+        basket_rect = pygame.Rect(10, SCREEN_HEIGHT - 120, 130, 120)
+        pygame.draw.rect(screen, (100, 50, 10), basket_rect) # Darker interior
+        
         self.bin.draw(screen)
         
-        # Draw Toys (Unheld)
+        # Draw Toys (Unheld first, then held)
         for toy in self.toys:
-            if toy != self.claw.held_toy:
-                toy.draw(screen)
-            
+           if not toy.grabbed:
+               toy.draw(screen)
+
+        # Draw Held Toy (Behind Claw for "Inside" look)
+        if self.claw.held_toy:
+             self.claw.held_toy.draw(screen)
+
         # Draw Claw
         self.claw.draw(screen)
-        
-        # Draw Held Toy (On Top for visibility)
-        if self.claw.held_toy:
-             # Ensure it's positioned correctly for drawing
-             self.claw.held_toy.draw(screen)
+             
+        # Draw Basket Front (Rim)
+        pygame.draw.rect(screen, (160, 82, 45), basket_rect, 5) # Lighter border
+        # Label
+        b_font = get_font(20)
+        b_text = b_font.render("PRIZES", True, (255, 220, 180))
+        screen.blit(b_text, (basket_rect.centerx - b_text.get_width()//2, basket_rect.y + 10))
         
         # Draw HUD (Score)
-        from src.utils import get_font, WHITE, BLACK
+        # from src.utils import get_font, WHITE, BLACK # Removed local import
         font = get_font(24)
         score_surf = font.render(f"Score: {self.score}", False, WHITE)
         screen.blit(score_surf, (SCREEN_WIDTH - 150, 10))
@@ -142,9 +254,16 @@ class Machine:
         # Level Stats HUD (Top Left)
         if self.level_logic and hasattr(self.level_logic, 'toys_collected'):
              # Toys Collected
-             toys_str = f"Toys: {self.level_logic.toys_collected}/{self.level_logic.toys_needed}"
+             toys_remaining = max(0, self.level_logic.toys_needed - self.level_logic.toys_collected)
+             toys_str = f"Toys Left: {toys_remaining}"
              toys_surf = font.render(toys_str, False, (0, 255, 255))
              screen.blit(toys_surf, (20, 10))
+             
+             # Timer Display
+             if self.attempt_active:
+                 t_color = (0, 255, 0) if self.attempt_timer > 3 else (255, 0, 0)
+                 timer_surf = font.render(f"Time: {self.attempt_timer:.1f}", True, t_color)
+                 screen.blit(timer_surf, (SCREEN_WIDTH//2 - 50, 60))
              
              # Chances
              rem_chances = self.level_logic.max_attempts - self.level_logic.attempts_used
@@ -179,6 +298,33 @@ class Machine:
              color = (0, 255, 0) if self.won else (255, 0, 0)
              go_surf = get_font(48).render(msg, False, color)
              screen.blit(go_surf, (SCREEN_WIDTH//2 - 150, SCREEN_HEIGHT//2 - 50))
+        
+        # Draw Start Button if needed
+        if not self.attempt_active and not self.game_over and self.claw.state == "IDLE":
+             # Reset Logic check: if chances > 0
+             can_play = True
+             if self.level_logic and hasattr(self.level_logic, "max_attempts"):
+                 if self.level_logic.attempts_used >= self.level_logic.max_attempts:
+                     can_play = False
+             
+             if can_play:
+                 # Draw "PRESS START" button or text
+                 # Using a simple rect for now
+                 btn_rect = pygame.Rect(SCREEN_WIDTH//2 - 60, 150, 120, 50)
+                 pygame.draw.rect(screen, (0, 200, 0), btn_rect)
+                 pygame.draw.rect(screen, WHITE, btn_rect, 3)
+                 
+                 s_font = get_font(24)
+                 lbl = s_font.render("START", True, WHITE)
+                 screen.blit(lbl, (btn_rect.centerx - lbl.get_width()//2, btn_rect.centery - lbl.get_height()//2))
+                 
+                 # Check click? Machine logic usually doesn't handle events directly.
+                 # But we can check mouse state here if we want or rely on GameManager passing events.
+                 # Better: auto-detect click in update? Or just check mouse for now.
+                 if pygame.mouse.get_pressed()[0]:
+                     mx, my = pygame.mouse.get_pos()
+                     if btn_rect.collidepoint(mx, my):
+                         self.start_attempt()
 
     def show_popup(self, message, duration=1.0):
         self.popup_message = message
@@ -199,24 +345,7 @@ class Machine:
             
             self.claw.held_toy.x += offset
             self.claw.held_toy.grabbed = False
-            
-            # Check if it landed in the chute (e.g., left side < 100)
-            if self.claw.held_toy.x < 100:
-                self.score += self.claw.held_toy.points
-                self.last_result = f"Score! +{self.claw.held_toy.points}"
-                
-                # Notify Level Logic if exists
-                if self.level_logic and hasattr(self.level_logic, "on_toy_collected"):
-                    self.level_logic.on_toy_collected()
-                    
-                # Remove toy or respawn?
-                self.toys.remove(self.claw.held_toy)
-                self.show_popup("COLLECTED!")
-            else:
-                self.last_result = "Dropped Outside"
-                # Return to bin Y
-                self.claw.held_toy.y = self.bin.y + self.bin.height - 10
-            
+            # Ensure gravity takes over
             self.claw.held_toy = None
 
     def attempt_grab(self):
@@ -264,16 +393,30 @@ class Machine:
              self.show_popup("MISSED!")
 
     def check_slip(self):
-        # Default Practice Mode Slip
-        if random.random() < 0.05: 
-            G = self.config.get("grip_strength", 0.8)
-            T = self.claw.held_toy.difficulty_factor
-            L = self.config.get("slip_chance", 0.1) * 5 
-            P_slip = (1.0 - G) * T * L
-            
-            if random.random() < P_slip:
-                print(f"Slipped! P_slip={P_slip:.2f}")
+        # Called every frame during LIFTING/RETURNING
+        # Small chance to slip per frame
+        if random.random() < 0.01: # 1% chance per frame to slip
+             # Can calculate based on grip strength
+             G = self.config.get("grip_strength", 0.8)
+             # Higher grip = lower slip chance
+             chance = 0.02 * (1.0 - G)
+             
+             if random.random() < chance:
+                print(f"Slipped!")
                 self.claw.held_toy.grabbed = False
-                self.claw.held_toy.y = self.bin.y + self.bin.height - 10 
+                # Add some horizontal velocity on slip
+                self.claw.held_toy.vx = random.uniform(-2, 2)
+                # Gravity will take it down
                 self.claw.held_toy = None
-                self.show_popup("SLIPPED!")
+             
+    def start_attempt(self):
+        self.attempt_active = True
+        self.attempt_timer = self.time_limit
+        self.show_popup("GO!", 0.5)
+
+    def fail_attempt(self):
+        self.attempt_active = False
+        self.show_popup("TIME UP!")
+        # Consume chance logic
+        if self.level_logic:
+             self.level_logic.attempts_used += 1

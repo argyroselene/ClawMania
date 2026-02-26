@@ -2,21 +2,27 @@ import pygame
 from src.ui import Button, Slider
 from src.utils import SCREEN_WIDTH, SCREEN_HEIGHT, BLACK, WHITE, get_font, BG_COLOR, TEXT_COLOR, load_image
 from src.machine import Machine
+from src.persistence import PersistenceManager
+from src.map_screen import MapScreen
 
 # Import Levels
 try:
     from src.levels.level1 import Level1
     from src.levels.level2 import Level2
     from src.levels.level3 import Level3
+    from src.levels.level4 import Level4
+    from src.levels.level5 import Level5
 except ImportError:
     # Fallback/Placeholder
     Level1 = None
     Level2 = None
     Level3 = None
+    Level4 = None
+    Level5 = None
 
 class GameManager:
     def __init__(self):
-        self.state = "MENU" # MENU, MODE_SELECT, PRACTICE_PARAMS, GAME, LEVEL_INTRO
+        self.state = "MENU" # MENU, MODE_SELECT, PRACTICE_PARAMS, GAME, LEVEL_INTRO, PAUSED
         self.mode = None # "PRACTICE" or "GAME"
         # Initial config based on presets
         self.config = {
@@ -31,11 +37,16 @@ class GameManager:
         self.machine = None
         
         # Level System
-        self.levels = [Level1, Level2, Level3] # registry
+        self.levels = [Level1, Level2, Level3, Level4, Level5] # registry
         self.current_level_index = 0
 
         # Assets
         self.menu_background = load_image("game_bg.png", SCREEN_WIDTH, SCREEN_HEIGHT) # Load global background
+
+        # Persistence & Map
+        self.persistence = PersistenceManager()
+        self.persistence.load_data()
+        self.map_screen = MapScreen(self.persistence, self)
 
         # UI Elements
         self.init_ui()
@@ -89,6 +100,12 @@ class GameManager:
         self.btn_start_custom = Button(center_x - 100, 520, 200, 50, "Start Session", action=self.start_custom_practice)
         self.btn_back_config = Button(10, 10, 100, 40, "Back", action=lambda: self.set_state("PRACTICE_PARAMS"))
 
+        # PAUSE MENU
+        # Moved to bottom right to avoid covering stats (which are top-left)
+        self.btn_pause = Button(SCREEN_WIDTH - 110, SCREEN_HEIGHT - 50, 100, 40, "Pause", action=self.toggle_pause)
+        self.btn_resume = Button(center_x - 100, 250, 200, 50, "Resume", action=self.toggle_pause)
+        self.btn_home = Button(center_x - 100, 320, 200, 50, "Main Menu", action=lambda: self.set_state("MENU"))
+
     def set_state(self, state):
         self.state = state
         print(f"State changed to: {self.state}")
@@ -98,9 +115,8 @@ class GameManager:
         if mode == "PRACTICE":
             self.set_state("PRACTICE_PARAMS")
         else:
-            # Start Game Mode Sequence
-            self.current_level_index = 0
-            self.set_state("LEVEL_INTRO")
+            # Start Game Mode Sequence -> Map Screen
+            self.set_state("MAP")
 
     def start_current_level(self):
         index = self.current_level_index
@@ -109,7 +125,8 @@ class GameManager:
             if lvl_class:
                 level_logic = lvl_class()
                 config = level_logic.get_config()
-                self.machine = Machine(config, level_logic=level_logic)
+                # Pass persistence to Machine for XP tracking
+                self.machine = Machine(config, level_logic=level_logic, persistence=self.persistence)
                 self.set_state("GAME")
             else:
                 print("Level class not found.")
@@ -145,7 +162,24 @@ class GameManager:
         self.mode = "PRACTICE"
         self.set_state("GAME")
 
+    def toggle_pause(self):
+        if self.state == "GAME":
+            self.set_state("PAUSED")
+        elif self.state == "PAUSED":
+            self.set_state("GAME")
+
     def update(self):
+        if self.state == "MAP":
+            # Handle Map events/update
+            # Events processed in main loop? GameManager.update usually runs per frame logic
+            # MapScreen might have internal logic
+            self.map_screen.update()
+            
+            # Handle input for map dragging here?
+            # Ideally GameManager passes events or handles inputs globally.
+            # But main.py loop calls handle_event.
+            pass
+
         if self.state == "GAME":
             if self.machine:
                 self.machine.update()
@@ -162,7 +196,9 @@ class GameManager:
                             self.level_transition_timer = 0
                             self.current_level_index += 1
                             if self.current_level_index < len(self.levels):
-                                self.set_state("LEVEL_INTRO")
+                                # Return to Map instead of auto-next for unlock system
+                                self.set_state("MAP")
+                                # self.set_state("LEVEL_INTRO")
                             else:
                                 # All levels done
                                 print("All levels completed!")
@@ -174,7 +210,7 @@ class GameManager:
             # Check for back to menu?
             keys = pygame.key.get_pressed()
             if keys[pygame.K_ESCAPE]:
-                self.set_state("MENU")
+                self.toggle_pause() # ESC toggles pause now instead of quitting directly
 
     def draw(self, screen):
         # Draw Background
@@ -256,6 +292,30 @@ class GameManager:
                          # Show "Loading..." or just wait for auto transition
                          wait_surf = get_font(24).render("Proceeding...", True, WHITE)
                          screen.blit(wait_surf, (SCREEN_WIDTH//2 - wait_surf.get_width()//2, SCREEN_HEIGHT//2 + 50))
+                
+                # Draw Pause Button
+                if not self.machine.game_over:
+                    self.btn_pause.draw(screen)
+
+        elif self.state == "MAP":
+            self.map_screen.draw(screen)
+
+        elif self.state == "PAUSED":
+            # Draw game background (machine) halted
+            if self.machine:
+                self.machine.draw(screen)
+            
+            # Overlay
+            s = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.SRCALPHA)
+            s.fill((0, 0, 0, 150))
+            screen.blit(s, (0, 0))
+            
+            font = get_font(48)
+            pause_surf = font.render("PAUSED", True, WHITE)
+            screen.blit(pause_surf, (SCREEN_WIDTH//2 - pause_surf.get_width()//2, 150))
+            
+            self.btn_resume.draw(screen)
+            self.btn_home.draw(screen)
 
     def handle_event(self, event):
         if self.state == "MENU":
@@ -287,6 +347,15 @@ class GameManager:
             if self.machine and self.machine.game_over:
                 if not self.machine.won:
                     self.btn_menu_lc.handle_event(event)
+            else:
+                 self.btn_pause.handle_event(event)
+
+        elif self.state == "PAUSED":
+            self.btn_resume.handle_event(event)
+            self.btn_home.handle_event(event)
+
+        elif self.state == "MAP":
+            self.map_screen.handle_event(event)
 
     def draw_title(self, screen, text):
         font = get_font(48)

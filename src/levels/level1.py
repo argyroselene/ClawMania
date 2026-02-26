@@ -24,7 +24,7 @@ class Level1:
         self.active_attempt = False  # Track grab attempt lifecycle
         
         # New Win Condition State
-        self.max_attempts = 6
+        self.max_attempts = 5
         self.attempts_used = 0
         self.toys_collected = 0
         self.toys_needed = 3
@@ -101,7 +101,8 @@ class Level1:
             status["success"] = False
             status["message"] = "Out of Chances!"
         else:
-            status["message"] = f"Toys: {self.toys_collected}/{self.toys_needed} | Chances: {self.max_attempts - self.attempts_used}"
+            toys_rem = self.toys_needed - self.toys_collected
+            status["message"] = f"Toys Left: {toys_rem} | Chances: {self.max_attempts - self.attempts_used}"
 
         return status
 
@@ -110,6 +111,10 @@ class Level1:
 
     def resolve_grab(self, claw_rect, toys):
         cx, cy, cw, ch = claw_rect
+        claw_center_x = cx + cw // 2
+
+        best_toy = None
+        min_dist = float('inf')
 
         for toy in toys:
             if toy.grabbed:
@@ -121,11 +126,21 @@ class Level1:
             
             if (cx < toy_left + toy.width and cx + cw > toy_left and
                 cy < toy.y and cy + ch > toy_top):
+                
+                # Calculate distance to center
+                toy_center_x = toy.x + toy.width // 2
+                dist = abs(claw_center_x - toy_center_x)
+                
+                if dist < min_dist:
+                    min_dist = dist
+                    best_toy = toy
 
-                # Easier probabilistic grip
-                if random.random() <= self.config["grip_strength"]:
-                    toy.grabbed = True
-                    return toy
+        if best_toy:
+             # Easier probabilistic grip
+            if random.random() <= self.config["grip_strength"]:
+                best_toy.grabbed = True
+                return best_toy
+                
         return None
 
     def apply_slip(self, claw, bin_obj=None):
