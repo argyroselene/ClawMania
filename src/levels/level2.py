@@ -135,7 +135,7 @@ class Level2:
         return offset
 
 
-    def on_toy_collected(self):
+    def on_toy_collected(self, toy=None):
         score = 100 
         self.toys_collected += 1
         self.level_score += score

@@ -149,6 +149,6 @@ class Level3:
         offset = max(-r, min(r, offset))
         return offset
 
-    def on_toy_collected(self):
+    def on_toy_collected(self, toy=None):
         self.toys_collected += 1
         self.message = "COLLECTED!"

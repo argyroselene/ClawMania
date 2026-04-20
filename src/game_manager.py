@@ -64,9 +64,10 @@ class GameManager:
         self.btn_quit = Button(center_x - 100, 340, 200, 50, "Quit", action=lambda: pygame.event.post(pygame.event.Event(pygame.QUIT)))
 
         # MODE SELECT
-        self.btn_practice = Button(center_x - 100, 200, 200, 50, "Practice Mode", action=lambda: self.choose_mode("PRACTICE"))
-        self.btn_game_mode = Button(center_x - 100, 270, 200, 50, "Game Mode", action=lambda: self.choose_mode("GAME"))
-        self.btn_back_main = Button(center_x - 100, 340, 200, 50, "Back", action=lambda: self.set_state("MENU"))
+        self.btn_practice = Button(center_x - 100, 150, 200, 50, "Practice Mode", action=lambda: self.choose_mode("PRACTICE"))
+        self.btn_game_mode = Button(center_x - 100, 220, 200, 50, "Game Mode", action=lambda: self.choose_mode("GAME"))
+        self.btn_ai_mode = Button(center_x - 100, 290, 200, 50, "AI Mode", action=lambda: self.choose_mode("AI_MODE"))
+        self.btn_back_main = Button(center_x - 100, 360, 200, 50, "Back", action=lambda: self.set_state("MENU"))
         
         # LEVEL INTRO DIALOG
         self.btn_start_level = Button(center_x - 100, 300, 200, 50, "Start Level", action=self.start_current_level)
@@ -112,9 +113,22 @@ class GameManager:
         self.mode = mode
         if mode == "PRACTICE":
             self.set_state("PRACTICE_PARAMS")
-        else:
+        elif mode == "GAME":
             # Start Game Mode Sequence -> Map Screen
             self.set_state("MAP")
+        elif mode == "AI_MODE":
+            self.start_ai_mode()
+
+    def start_ai_mode(self):
+        try:
+            from src.levels.ai_mode import AIMode
+            level_logic = AIMode()
+            config = level_logic.get_config()
+            self.mode = "AI_MODE"
+            self.machine = Machine(config, level_logic=level_logic, persistence=None)
+            self.set_state("GAME")
+        except ImportError as e:
+            print(f"Error loading AI mode: {e}")
 
     def start_current_level(self):
         index = self.current_level_index
@@ -178,8 +192,12 @@ class GameManager:
                 self.machine.update()
                 
                 # Check for Level Win / Loss
-                if self.mode == "GAME" and self.machine.game_over:
-                    if self.machine.won:
+                if self.machine.game_over:
+                    if self.mode == "AI_MODE":
+                        # AI match over: return to menu immediately or via overlay
+                        # The Machine handles drawing the result message now
+                        pass
+                    elif self.mode == "GAME" and self.machine.won:
                         # Victory Logic with auto-progression timer
                         if self.level_transition_timer == 0:
                             self.level_transition_timer = pygame.time.get_ticks()
@@ -189,16 +207,9 @@ class GameManager:
                             self.level_transition_timer = 0
                             self.current_level_index += 1
                             if self.current_level_index < len(self.levels):
-                                # Return to Map instead of auto-next for unlock system
                                 self.set_state("MAP")
-                                # self.set_state("LEVEL_INTRO")
                             else:
-                                # All levels done
-                                print("All levels completed!")
-                                self.set_state("MENU") # Or a "Victory" screen
-                    else:
-                        # Loss Logic - Game Over screen (handled in draw/event)
-                        pass
+                                self.set_state("MENU")
 
             # Check for back to menu?
             keys = pygame.key.get_pressed()
@@ -223,6 +234,7 @@ class GameManager:
         elif self.state == "MODE_SELECT":
             self.btn_practice.draw(screen)
             self.btn_game_mode.draw(screen)
+            self.btn_ai_mode.draw(screen)
             self.btn_back_main.draw(screen)
             
         elif self.state == "LEVEL_INTRO":
@@ -270,16 +282,19 @@ class GameManager:
                      s.fill((0, 0, 0, 150))
                      screen.blit(s, (0, 0))
                      
-                     msg = "LEVEL COMPLETE!" if self.machine.won else "GAME OVER"
-                     color = (0, 255, 0) if self.machine.won else (255, 0, 0)
+                     # In AI Mode, Machine draws the message. In GAME mode, GameManager does.
+                     is_ai = hasattr(self.machine.level_logic, "draw_hud")
+                     if not is_ai:
+                         msg = "LEVEL COMPLETE!" if self.machine.won else "GAME OVER"
+                         color = (0, 255, 0) if self.machine.won else (255, 0, 0)
+                         
+                         font = get_font(48)
+                         res_surf = font.render(msg, True, color)
+                         screen.blit(res_surf, (SCREEN_WIDTH//2 - res_surf.get_width()//2, SCREEN_HEIGHT//2 - 50))
                      
-                     font = get_font(48)
-                     res_surf = font.render(msg, True, color)
-                     screen.blit(res_surf, (SCREEN_WIDTH//2 - res_surf.get_width()//2, SCREEN_HEIGHT//2 - 50))
-                     
-                     if not self.machine.won:
+                     if not self.machine.won or is_ai:
                          self.btn_menu_lc.draw(screen)
-                     else:
+                     elif self.mode == "GAME":
                          # Show "Loading..." or just wait for auto transition
                          wait_surf = get_font(24).render("Proceeding...", True, WHITE)
                          screen.blit(wait_surf, (SCREEN_WIDTH//2 - wait_surf.get_width()//2, SCREEN_HEIGHT//2 + 50))
@@ -317,6 +332,7 @@ class GameManager:
         elif self.state == "MODE_SELECT":
             self.btn_practice.handle_event(event)
             self.btn_game_mode.handle_event(event)
+            self.btn_ai_mode.handle_event(event)
             self.btn_back_main.handle_event(event)
             
         elif self.state == "LEVEL_INTRO":
@@ -336,7 +352,8 @@ class GameManager:
         elif self.state == "GAME":
             # Handle overlay buttons if game over
             if self.machine and self.machine.game_over:
-                if not self.machine.won:
+                is_ai = hasattr(self.machine.level_logic, "draw_hud")
+                if not self.machine.won or is_ai:
                     self.btn_menu_lc.handle_event(event)
             else:
                  self.btn_pause.handle_event(event)
