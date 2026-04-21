@@ -1,6 +1,6 @@
 import pygame
 from src.ui import Button, Slider
-from src.utils import SCREEN_WIDTH, SCREEN_HEIGHT, BLACK, WHITE, get_font, BG_COLOR, TEXT_COLOR, load_image, play_bg_music
+from src.utils import SCREEN_WIDTH, SCREEN_HEIGHT, BLACK, WHITE, get_font, BG_COLOR, TEXT_COLOR, load_image, play_bg_music, NEON_GREEN
 from src.machine import Machine
 from src.persistence import PersistenceManager
 from src.map_screen import MapScreen
@@ -60,8 +60,9 @@ class GameManager:
         
         # MAIN MENU
         self.btn_start = Button(center_x - 100, 200, 200, 50, "Start Game", action=lambda: self.set_state("MODE_SELECT"))
-        self.btn_settings = Button(center_x - 100, 270, 200, 50, "Settings", action=lambda: print("Settings clicked"))
-        self.btn_quit = Button(center_x - 100, 340, 200, 50, "Quit", action=lambda: pygame.event.post(pygame.event.Event(pygame.QUIT)))
+        self.btn_settings = Button(center_x - 100, 270, 200, 50, "Settings", action=lambda: self.set_state("SETTINGS"))
+        self.btn_simulation = Button(center_x - 100, 340, 200, 50, "Simulation", action=lambda: self.set_state("SIMULATION_CONFIG"))
+        self.btn_quit = Button(center_x - 100, 410, 200, 50, "Quit", action=lambda: pygame.event.post(pygame.event.Event(pygame.QUIT)))
 
         # MODE SELECT
         self.btn_practice = Button(center_x - 100, 150, 200, 50, "Practice Mode", action=lambda: self.choose_mode("PRACTICE"))
@@ -104,6 +105,21 @@ class GameManager:
         self.btn_pause = Button(SCREEN_WIDTH - 110, SCREEN_HEIGHT - 50, 100, 40, "Pause", action=self.toggle_pause)
         self.btn_resume = Button(center_x - 100, 250, 200, 50, "Resume", action=self.toggle_pause)
         self.btn_home = Button(center_x - 100, 320, 200, 50, "Main Menu", action=lambda: self.set_state("MENU"))
+
+        # SETTINGS UI
+        self.slider_volume = Slider(center_x - s_width//2, 250, s_width, 0.0, 1.0, 0.5, "Music Volume", font_size=18)
+        self.btn_back_settings = Button(center_x - 100, 350, 200, 50, "Back", action=lambda: self.set_state("MENU"))
+
+        # SIMULATION UI
+        self.sim_sliders = [
+            Slider(center_x - s_width//2, start_y, s_width, 0.0, 1.0, 0.8, "Grip Strength", font_size=18),
+            Slider(center_x - s_width//2, start_y + gap, s_width, 0.0, 1.0, 1.0, "Alignment", font_size=18),
+            Slider(center_x - s_width//2, start_y + gap*2, s_width, 0.1, 2.0, 1.0, "Toy Difficulty", font_size=18),
+            Slider(center_x - s_width//2, start_y + gap*3, s_width, 100, 100000, 1000, "Iterations", font_size=18)
+        ]
+        self.btn_start_sim = Button(center_x - 100, 480, 200, 50, "Run Simulation", action=self.start_simulation)
+        self.btn_back_sim = Button(10, 10, 100, 40, "Back", action=lambda: self.set_state("MENU"))
+        self.btn_back_sim_res = Button(center_x - 100, 480, 200, 50, "Back", action=lambda: self.set_state("SIMULATION_CONFIG"))
 
     def set_state(self, state):
         self.state = state
@@ -174,6 +190,42 @@ class GameManager:
         self.mode = "PRACTICE"
         self.set_state("GAME")
 
+    def start_simulation(self):
+        self.sim_total_iterations = int(self.sim_sliders[3].value)
+        self.sim_timer = pygame.time.get_ticks()
+        self.set_state("SIMULATION_RUNNING")
+
+    def run_simulation(self):
+        import random
+        grip = self.sim_sliders[0].value
+        alignment = self.sim_sliders[1].value
+        toy_diff = self.sim_sliders[2].value
+        iterations = int(self.sim_sliders[3].value)
+        
+        wins = 0
+        for i in range(iterations):
+            p_grab = grip * alignment * toy_diff * 1.0
+            if random.random() <= p_grab:
+                slipped = False
+                chance_per_frame = 0.02 * (1.0 - grip) # Reduced slip chance logic from check_slip()
+                for frame in range(200): # Approximate duration of LIFTING and RETURNING phases
+                    if random.random() < 0.01:
+                        if random.random() < chance_per_frame:
+                            slipped = True
+                            break
+                if not slipped:
+                    wins += 1
+        
+        self.sim_results = {
+            "iterations": iterations,
+            "wins": wins,
+            "probability": (wins / iterations) * 100,
+            "grip": grip,
+            "alignment": alignment,
+            "toy_diff": toy_diff
+        }
+        self.set_state("SIMULATION_RESULTS")
+
     def toggle_pause(self):
         if self.state == "GAME":
             self.set_state("PAUSED")
@@ -181,6 +233,14 @@ class GameManager:
             self.set_state("GAME")
 
     def update(self):
+        if self.state == "SETTINGS":
+            # Apply volume dynamically
+            pygame.mixer.music.set_volume(self.slider_volume.value)
+
+        if self.state == "SIMULATION_RUNNING":
+            if pygame.time.get_ticks() - self.sim_timer > 100:
+                self.run_simulation()
+
         if self.state == "MAP":
             
             self.map_screen.update()
@@ -218,7 +278,7 @@ class GameManager:
 
     def draw(self, screen):
         # Draw Background
-        if self.state == "PRACTICE_CONFIG_CUSTOM" and self.practice_background:
+        if self.state in ["PRACTICE_CONFIG_CUSTOM", "SIMULATION_CONFIG", "SIMULATION_RUNNING", "SIMULATION_RESULTS", "SETTINGS"] and self.practice_background:
              screen.blit(self.practice_background, (0, 0))
         elif self.menu_background and self.state != "GAME":
              screen.blit(self.menu_background, (0, 0))
@@ -229,8 +289,17 @@ class GameManager:
             # self.draw_title(screen, "ClawMania") # Removed as per user request
             self.btn_start.draw(screen)
             self.btn_settings.draw(screen)
+            self.btn_simulation.draw(screen)
             self.btn_quit.draw(screen)
             
+        elif self.state == "SETTINGS":
+            font_title = get_font(48)
+            title = font_title.render("SETTINGS", True, WHITE)
+            screen.blit(title, (SCREEN_WIDTH//2 - title.get_width()//2, 120))
+            
+            self.slider_volume.draw(screen)
+            self.btn_back_settings.draw(screen)
+
         elif self.state == "MODE_SELECT":
             self.btn_practice.draw(screen)
             self.btn_game_mode.draw(screen)
@@ -270,6 +339,49 @@ class GameManager:
                 slider.draw(screen)
             self.btn_start_custom.draw(screen)
             self.btn_back_config.draw(screen)
+
+        elif self.state == "SIMULATION_CONFIG":
+            for slider in self.sim_sliders:
+                slider.draw(screen)
+            self.btn_start_sim.draw(screen)
+            self.btn_back_sim.draw(screen)
+
+        elif self.state == "SIMULATION_RUNNING":
+            font = get_font(36)
+            text = font.render(f"Simulating {self.sim_total_iterations} iterations...", True, WHITE)
+            screen.blit(text, (SCREEN_WIDTH//2 - text.get_width()//2, SCREEN_HEIGHT//2))
+
+        elif self.state == "SIMULATION_RESULTS":
+            # Draw semi-transparent overlay
+            s = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.SRCALPHA)
+            s.fill((0, 0, 0, 150))
+            screen.blit(s, (0,0))
+            
+            # Dialog Box
+            dialog_rect = pygame.Rect(SCREEN_WIDTH//2 - 250, SCREEN_HEIGHT//2 - 200, 500, 400)
+            pygame.draw.rect(screen, BG_COLOR, dialog_rect)
+            pygame.draw.rect(screen, WHITE, dialog_rect, 3)
+
+            font_title = get_font(36)
+            font_text = get_font(24)
+            
+            title = font_title.render("Simulation Results", True, WHITE)
+            screen.blit(title, (dialog_rect.centerx - title.get_width()//2, dialog_rect.y + 40))
+            
+            res = getattr(self, "sim_results", {})
+            lines = [
+                f"Iterations: {res.get('iterations', 0)}",
+                f"Wins: {res.get('wins', 0)}",
+                f"Win Probability: {res.get('probability', 0.0):.2f}%"
+            ]
+            
+            for i, line in enumerate(lines):
+                text_surf = font_text.render(line, True, NEON_GREEN)
+                screen.blit(text_surf, (dialog_rect.centerx - text_surf.get_width()//2, dialog_rect.y + 120 + i * 50))
+                
+            self.btn_back_sim_res.rect.centerx = dialog_rect.centerx
+            self.btn_back_sim_res.rect.y = dialog_rect.y + 300
+            self.btn_back_sim_res.draw(screen)
 
         elif self.state == "GAME":
             if self.machine:
@@ -327,8 +439,13 @@ class GameManager:
         if self.state == "MENU":
             self.btn_start.handle_event(event)
             self.btn_settings.handle_event(event)
+            self.btn_simulation.handle_event(event)
             self.btn_quit.handle_event(event)
             
+        elif self.state == "SETTINGS":
+            self.slider_volume.handle_event(event)
+            self.btn_back_settings.handle_event(event)
+
         elif self.state == "MODE_SELECT":
             self.btn_practice.handle_event(event)
             self.btn_game_mode.handle_event(event)
@@ -348,6 +465,15 @@ class GameManager:
                 slider.handle_event(event)
             self.btn_start_custom.handle_event(event)
             self.btn_back_config.handle_event(event)
+
+        elif self.state == "SIMULATION_CONFIG":
+            for slider in self.sim_sliders:
+                slider.handle_event(event)
+            self.btn_start_sim.handle_event(event)
+            self.btn_back_sim.handle_event(event)
+            
+        elif self.state == "SIMULATION_RESULTS":
+            self.btn_back_sim_res.handle_event(event)
             
         elif self.state == "GAME":
             # Handle overlay buttons if game over
