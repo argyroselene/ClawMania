@@ -83,7 +83,7 @@ class Level4:
 
         return status
 
-    def on_toy_collected(self):
+    def on_toy_collected(self, toy=None):
         self.toys_collected += 1
         self.message = "COLLECTED!"
 

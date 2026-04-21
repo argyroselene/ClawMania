@@ -69,7 +69,7 @@ class Level1:
 
         return status
 
-    def on_toy_collected(self):
+    def on_toy_collected(self, toy=None):
         self.toys_collected += 1
 
     def resolve_grab(self, claw_rect, toys):

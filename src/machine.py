@@ -68,13 +68,17 @@ class Machine:
         start_x = self.bin.x + 20
         start_y = self.bin.y + self.bin.height - 10
         
-        # Simple grid for now
-        for i in range(5):
+        num_toys = 5
+        if hasattr(self, "level_logic") and self.level_logic:
+             if hasattr(self.level_logic, "config") and "num_toys" in self.level_logic.config:
+                 num_toys = self.level_logic.config["num_toys"]
+
+        for i in range(num_toys):
              # varying sizes
             size = random.choice(["small", "medium", "large"])
-            # Distribute them relative to bin position
-            toy_x = start_x + i * 60
-            toy = Toy(toy_x, start_y, size)
+            # Randomly distribute across the bin width
+            spawn_x = random.randint(int(self.bin.x + 20), int(self.bin.x + self.bin.width - 60))
+            toy = Toy(spawn_x, start_y, size)
             self.toys.append(toy)
 
     def update(self):
@@ -113,7 +117,7 @@ class Machine:
                              
                          # Update stats
                          if self.level_logic and hasattr(self.level_logic, "on_toy_collected"):
-                             self.level_logic.on_toy_collected()
+                             self.level_logic.on_toy_collected(toy)
             
         # 3. Update Claw
         # 3. Update Claw
@@ -215,11 +219,18 @@ class Machine:
         b_text = b_font.render("PRIZES", True, (255, 220, 180))
         screen.blit(b_text, (basket_rect.centerx - b_text.get_width()//2, basket_rect.y + 10))
         
-        # Draw HUD (Score)
-        # from src.utils import get_font, WHITE, BLACK # Removed local import
+        # HUD
         font = get_font(24)
-        score_surf = font.render(f"Score: {self.score}", False, WHITE)
-        screen.blit(score_surf, (SCREEN_WIDTH - 150, 10))
+        
+        # Draw AI Mode HUD if applicable
+        is_ai = hasattr(self.level_logic, "draw_hud")
+        if is_ai:
+            self.level_logic.draw_hud(screen)
+        
+        # Hide global score in AI Mode
+        if not is_ai:
+            score_surf = font.render(f"Score: {self.score}", False, WHITE)
+            screen.blit(score_surf, (SCREEN_WIDTH - 150, 10))
         
         # Level Stats HUD (Top Left)
         if self.level_logic and hasattr(self.level_logic, 'toys_collected'):
@@ -247,27 +258,32 @@ class Machine:
                  msg_surf = font.render(self.last_result, True, (255, 255, 0))
                  screen.blit(msg_surf, (20, 70))
 
-        # Popup Message (Center)
+        # Popup Message (Center) - White Style
         if self.popup_message and pygame.time.get_ticks() < self.popup_end_time:
             # Draw Box
-            padding = 20
-            pop_font = get_font(36)
-            text_surf = pop_font.render(self.popup_message, True, WHITE)
+            padding = 15
+            pop_font = get_font(28)
+            text_surf = pop_font.render(self.popup_message, True, BLACK)
             
-            bg_rect = text_surf.get_rect(center=(SCREEN_WIDTH//2, SCREEN_HEIGHT//2 - 50))
+            bg_rect = text_surf.get_rect(center=(SCREEN_WIDTH//2, SCREEN_HEIGHT//2 - 80))
             bg_rect.inflate_ip(padding*2, padding)
             
-            pygame.draw.rect(screen, (0, 0, 0, 200), bg_rect)
-            pygame.draw.rect(screen, WHITE, bg_rect, 2)
+            # Draw White Box with Shadow-like border
+            pygame.draw.rect(screen, WHITE, bg_rect, border_radius=5)
+            pygame.draw.rect(screen, (180, 180, 180), bg_rect, 2, border_radius=5)
             screen.blit(text_surf, text_surf.get_rect(center=bg_rect.center))
         else:
             self.popup_message = None # Reset
 
         if self.game_over:
-             msg = "LEVEL COMPLETE!" if self.won else "GAME OVER"
+             # Use the message from level logic if available
+             msg = self.last_result if self.last_result else ("LEVEL COMPLETE!" if self.won else "GAME OVER")
              color = (0, 255, 0) if self.won else (255, 0, 0)
-             go_surf = get_font(48).render(msg, False, color)
-             screen.blit(go_surf, (SCREEN_WIDTH//2 - 150, SCREEN_HEIGHT//2 - 50))
+             go_font = get_font(48)
+             go_surf = go_font.render(msg, False, color)
+             
+             # Center text
+             screen.blit(go_surf, (SCREEN_WIDTH//2 - go_surf.get_width()//2, SCREEN_HEIGHT//2 - 50))
         
         # Draw Start Button if needed
         if not self.attempt_active and not self.game_over and self.claw.state == "IDLE":
@@ -275,6 +291,10 @@ class Machine:
              can_play = True
              if self.level_logic and hasattr(self.level_logic, "max_attempts"):
                  if self.level_logic.attempts_used >= self.level_logic.max_attempts:
+                     can_play = False
+             
+             if self.level_logic and hasattr(self.level_logic, "is_ai_turn"):
+                 if self.level_logic.is_ai_turn():
                      can_play = False
              
              if can_play:
