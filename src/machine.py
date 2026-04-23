@@ -78,7 +78,11 @@ class Machine:
             size = random.choice(["small", "medium", "large"])
             # Randomly distribute across the bin width
             spawn_x = random.randint(int(self.bin.x + 20), int(self.bin.x + self.bin.width - 60))
-            toy = Toy(spawn_x, start_y, size)
+            
+            # Random toy image ID (1, 2, or 3)
+            toy_id = random.randint(1, 3)
+            
+            toy = Toy(spawn_x, start_y, size, toy_id=toy_id)
             self.toys.append(toy)
 
     def update(self):

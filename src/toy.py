@@ -3,7 +3,7 @@ import random
 from src.utils import WHITE, PIXEL_YELLOW, CYAN, HOT_PINK, NEON_GREEN
 
 class Toy:
-    def __init__(self, x, y, size="medium"):
+    def __init__(self, x, y, size="medium", toy_id=1):
         self.x = x
         self.y = y
         self.base_y = y # To return to if dropped
@@ -13,6 +13,7 @@ class Toy:
         self.vx = 0
         self.in_basket = False
         self.on_ground = False
+        self.toy_id = toy_id
         
         # Properties based on size
         if size == "small":
@@ -84,7 +85,10 @@ class Toy:
                 import os
                 
                 base_path = os.path.dirname(os.path.dirname(__file__)) 
-                image_path = os.path.join(base_path, "assets", "images", "toy.png")
+                
+                filename = "toy.png" if self.toy_id == 1 else f"toy{self.toy_id}.png"
+                image_path = os.path.join(base_path, "assets", "images", filename)
+                
                 self.image = pygame.image.load(image_path).convert_alpha()
 
                 self.image = pygame.transform.scale(self.image, (self.width, self.height))
