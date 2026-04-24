@@ -112,10 +112,13 @@ class GameManager:
 
         # SIMULATION UI
         self.sim_sliders = [
-            Slider(center_x - s_width//2, start_y, s_width, 0.0, 1.0, 0.8, "Grip Strength", font_size=18),
-            Slider(center_x - s_width//2, start_y + gap, s_width, 0.0, 1.0, 1.0, "Alignment", font_size=18),
-            Slider(center_x - s_width//2, start_y + gap*2, s_width, 0.1, 2.0, 1.0, "Toy Difficulty", font_size=18),
-            Slider(center_x - s_width//2, start_y + gap*3, s_width, 100, 100000, 1000, "Iterations", font_size=18)
+            Slider(center_x - s_width//2, 100, s_width, 0.0, 1.0, 0.8, "Grip Strength", font_size=18),
+            Slider(center_x - s_width//2, 100 + 50, s_width, 1.0, 10.0, 5.0, "Lift Speed", font_size=18),
+            Slider(center_x - s_width//2, 100 + 50*2, s_width, 0.0, 1.0, 0.1, "Slip Chance", font_size=18),
+            Slider(center_x - s_width//2, 100 + 50*3, s_width, 0.0, 2.0, 0.5, "Drop Delay (s)", font_size=18),
+            Slider(center_x - s_width//2, 100 + 50*4, s_width, 0.0, 50.0, 5.0, "Release Offset", font_size=18),
+            Slider(center_x - s_width//2, 100 + 50*5, s_width, 0.0, 10.0, 0.0, "Bin Speed", font_size=18),
+            Slider(center_x - s_width//2, 100 + 50*6, s_width, 100, 100000, 1000, "Iterations", font_size=18)
         ]
         self.btn_start_sim = Button(center_x - 100, 480, 200, 50, "Run Simulation", action=self.start_simulation)
         self.btn_back_sim = Button(10, 10, 100, 40, "Back", action=lambda: self.set_state("MENU"))
@@ -188,41 +191,80 @@ class GameManager:
         # Starts PRACTICE mode (no level logic)
         self.machine = Machine(self.config) 
         self.mode = "PRACTICE"
+        
+        self.machine.win_probability = self.calculate_theoretical_probability(self.config, iterations=2000)
         self.set_state("GAME")
 
     def start_simulation(self):
-        self.sim_total_iterations = int(self.sim_sliders[3].value)
+        self.sim_total_iterations = int(self.sim_sliders[6].value)
         self.sim_timer = pygame.time.get_ticks()
         self.set_state("SIMULATION_RUNNING")
 
-    def run_simulation(self):
+    def calculate_theoretical_probability(self, config, iterations=1000):
         import random
-        grip = self.sim_sliders[0].value
-        alignment = self.sim_sliders[1].value
-        toy_diff = self.sim_sliders[2].value
-        iterations = int(self.sim_sliders[3].value)
+        grip = config.get("grip_strength", 0.8)
+        lift_speed = config.get("lift_speed", 5.0)
+        slip_chance = config.get("slip_chance", 0.1)
+        drop_delay = config.get("drop_delay", 0.5)
+        release_offset = config.get("release_offset", 5.0)
+        bin_speed = config.get("bin_speed", 0.0)
+        
+        toy_diff = 1.0 # Assume average
+        
+        # Calculate alignment loss due to bin movement during drop_delay
+        frames_delay = drop_delay * 60
+        distance_moved = bin_speed * frames_delay
         
         wins = 0
         for i in range(iterations):
-            p_grab = grip * alignment * toy_diff * 1.0
+            # Simulated distance at grab
+            initial_dist = random.uniform(0, 10)
+            final_dist = abs(initial_dist - distance_moved * random.choice([1, -1]))
+            alignment = max(0.0, 1.0 - (final_dist / 40.0))
+            
+            p_grab = grip * alignment * toy_diff
+            
             if random.random() <= p_grab:
+                # Lifting and returning logic
+                frames_lifting = 370 / max(1.0, lift_speed)
+                frames_returning = 325 / 5.0
+                total_frames = frames_lifting + frames_returning
+                
+                per_frame_slip = 0.01 * slip_chance
+                
                 slipped = False
-                chance_per_frame = 0.02 * (1.0 - grip) # Reduced slip chance logic from check_slip()
-                for frame in range(200): # Approximate duration of LIFTING and RETURNING phases
-                    if random.random() < 0.01:
-                        if random.random() < chance_per_frame:
-                            slipped = True
-                            break
+                for frame in range(int(total_frames)):
+                    if random.random() < per_frame_slip:
+                        slipped = True
+                        break
+                
                 if not slipped:
-                    wins += 1
+                    # Drop accuracy
+                    actual_offset = random.uniform(-release_offset, release_offset)
+                    drop_x = 75 + actual_offset
+                    # Basket is roughly 10 to 140 in width
+                    if 10 <= drop_x <= 140:
+                        wins += 1
+                        
+        return (wins / iterations) * 100
+
+    def run_simulation(self):
+        config_from_sliders = {
+            "grip_strength": self.sim_sliders[0].value,
+            "lift_speed": self.sim_sliders[1].value,
+            "slip_chance": self.sim_sliders[2].value,
+            "drop_delay": self.sim_sliders[3].value,
+            "release_offset": self.sim_sliders[4].value,
+            "bin_speed": self.sim_sliders[5].value,
+        }
+        iterations = int(self.sim_sliders[6].value)
+        
+        prob = self.calculate_theoretical_probability(config_from_sliders, iterations)
         
         self.sim_results = {
             "iterations": iterations,
-            "wins": wins,
-            "probability": (wins / iterations) * 100,
-            "grip": grip,
-            "alignment": alignment,
-            "toy_diff": toy_diff
+            "wins": int(prob * iterations / 100),
+            "probability": prob,
         }
         self.set_state("SIMULATION_RESULTS")
 
