@@ -235,6 +235,25 @@ class Machine:
         if not is_ai:
             score_surf = font.render(f"Score: {self.score}", False, WHITE)
             screen.blit(score_surf, (SCREEN_WIDTH - 150, 10))
+            
+        # Draw Win Probability if available
+        if hasattr(self, 'win_probability') and self.win_probability is not None:
+             prob_text = font.render(f"Win Prob: {self.win_probability:.1f}%", True, WHITE)
+             
+             bar_w = 150
+             bar_h = 20
+             bar_x = SCREEN_WIDTH - bar_w - 20
+             bar_y = 70
+             
+             pygame.draw.rect(screen, (50, 50, 50), (bar_x, bar_y, bar_w, bar_h))
+             fill_w = int((self.win_probability / 100.0) * bar_w)
+             if fill_w > 0:
+                 r = min(255, max(0, int(255 * (100 - self.win_probability) / 50)))
+                 g = min(255, max(0, int(255 * self.win_probability / 50)))
+                 pygame.draw.rect(screen, (r, g, 0), (bar_x, bar_y, fill_w, bar_h))
+             pygame.draw.rect(screen, WHITE, (bar_x, bar_y, bar_w, bar_h), 2)
+             
+             screen.blit(prob_text, (bar_x, bar_y - 25))
         
         # Level Stats HUD (Top Left)
         if self.level_logic and hasattr(self.level_logic, 'toys_collected'):
@@ -387,7 +406,7 @@ class Machine:
              # Can calculate based on grip strength
              G = self.config.get("grip_strength", 0.8)
              # Higher grip = lower slip chance
-             chance = 0.02 * (1.0 - G)
+             chance = self.config.get("slip_chance", 0.02 * (1.0 - G))
              
              if random.random() < chance:
                 print(f"Slipped!")
