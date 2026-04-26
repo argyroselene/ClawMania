@@ -5,12 +5,12 @@ class AIMode:
     def __init__(self):
         self.config = {
             "name": "AI Mode",
-            "grip_strength": 0.95,        
+            "grip_strength": 0.90,        
             "slip_probability": 0.02,     
-            "drop_offset_range": 2.0,     
+            "drop_offset_range": .5,     
             "control_time": 12.0,
             "bin_speed": 0,
-            "num_toys": 10
+            "num_toys": 7
         }
 
         self.slip_checked = False
@@ -19,6 +19,8 @@ class AIMode:
         # Turn state
         self.total_turns_allowed = 6
         self.turns_played = 0
+        self.player_turns_left = 3
+        self.ai_turns_left = 3
         
         # Random first turn: "PLAYER" or "AI"
         self.current_turn = random.choice(["PLAYER", "AI"])
@@ -29,6 +31,10 @@ class AIMode:
         # For AI auto movement
         self.ai_target_x = None
         self.turn_end_timer = 0
+        
+        # Load heart sprite
+        from src.utils import load_image
+        self.heart_img = load_image("heart.png", 30, 30) # Slightly smaller for HUD
 
     def get_config(self):
         return self.config
@@ -37,7 +43,7 @@ class AIMode:
         return self.current_turn == "AI"
 
     def update(self, dt, claw, toys, bin_obj):
-        status = {"game_over": False, "success": False, "message": ""}
+        status = {"game_over": False, "success": False, "message": "", "is_tie": False}
         
         if self.turns_played >= self.total_turns_allowed:
             status["game_over"] = True
@@ -51,7 +57,8 @@ class AIMode:
                 status["success"] = False
                 status["message"] = "AI WINS!"
             else:
-                status["success"] = True 
+                status["success"] = False # Not a win
+                status["is_tie"] = True
                 status["message"] = "IT'S A TIE!"
             return status
 
@@ -74,6 +81,11 @@ class AIMode:
 
         if self.turn_state == "FINISHED_TURN":
             if pygame.time.get_ticks() - getattr(self, 'turn_end_timer', 0) > 2500: # 2.5 seconds delay
+                if self.current_turn == "PLAYER":
+                    self.player_turns_left -= 1
+                else:
+                    self.ai_turns_left -= 1
+                    
                 self.turns_played += 1
                 self.turn_state = "WAITING"
                 if self.turns_played < self.total_turns_allowed:
@@ -113,7 +125,7 @@ class AIMode:
         return status
 
     def draw_hud(self, screen):
-        from src.utils import get_font, WHITE, SCREEN_WIDTH
+        from src.utils import get_font, WHITE, SCREEN_WIDTH, DEEP_PURPLE
         font = get_font(28)
         
         # Player Score Box
@@ -140,6 +152,17 @@ class AIMode:
             
         ind_surf = get_font(20).render(indicator_text, True, color)
         screen.blit(ind_surf, (SCREEN_WIDTH // 2 - ind_surf.get_width()//2, 65))
+
+        # Hearts for turns left
+        if self.heart_img:
+            # Player Hearts (Top Left)
+            for i in range(max(0, self.player_turns_left)):
+                screen.blit(self.heart_img, (10 + i * 35, 15))
+            
+            # AI Hearts (Top Right)
+            for i in range(max(0, self.ai_turns_left)):
+                # Draw from right to left
+                screen.blit(self.heart_img, (SCREEN_WIDTH - 40 - i * 35, 15))
 
     def pick_ai_target(self, toys, bin_obj):
         # Pick a regular ungrabbed toy

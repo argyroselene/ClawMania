@@ -1,6 +1,6 @@
 import pygame
 from src.ui import Button, Slider
-from src.utils import SCREEN_WIDTH, SCREEN_HEIGHT, BLACK, WHITE, get_font, BG_COLOR, TEXT_COLOR, load_image, play_bg_music, NEON_GREEN
+from src.utils import SCREEN_WIDTH, SCREEN_HEIGHT, BLACK, WHITE, get_font, BG_COLOR, TEXT_COLOR, load_image, play_bg_music, NEON_GREEN, DEEP_PURPLE
 from src.machine import Machine
 from src.persistence import PersistenceManager
 from src.map_screen import MapScreen
@@ -43,6 +43,7 @@ class GameManager:
         # Assets
         self.menu_background = load_image("game_bg.png", SCREEN_WIDTH, SCREEN_HEIGHT) # Load global background
         self.practice_background = load_image("practicepage.png", SCREEN_WIDTH, SCREEN_HEIGHT) # Load practice background
+        self.sim_result_bg = load_image("simulation_result.png", 500, 400)
 
         # Persistence & Map
         self.persistence = PersistenceManager()
@@ -336,7 +337,7 @@ class GameManager:
             
         elif self.state == "SETTINGS":
             font_title = get_font(48)
-            title = font_title.render("SETTINGS", True, WHITE)
+            title = font_title.render("SETTINGS", True, DEEP_PURPLE)
             screen.blit(title, (SCREEN_WIDTH//2 - title.get_width()//2, 120))
             
             self.slider_volume.draw(screen)
@@ -390,7 +391,7 @@ class GameManager:
 
         elif self.state == "SIMULATION_RUNNING":
             font = get_font(36)
-            text = font.render(f"Simulating {self.sim_total_iterations} iterations...", True, WHITE)
+            text = font.render(f"Simulating {self.sim_total_iterations} iterations...", True, DEEP_PURPLE)
             screen.blit(text, (SCREEN_WIDTH//2 - text.get_width()//2, SCREEN_HEIGHT//2))
 
         elif self.state == "SIMULATION_RESULTS":
@@ -401,13 +402,18 @@ class GameManager:
             
             # Dialog Box
             dialog_rect = pygame.Rect(SCREEN_WIDTH//2 - 250, SCREEN_HEIGHT//2 - 200, 500, 400)
-            pygame.draw.rect(screen, BG_COLOR, dialog_rect)
+            
+            if self.sim_result_bg:
+                screen.blit(self.sim_result_bg, dialog_rect.topleft)
+            else:
+                pygame.draw.rect(screen, BG_COLOR, dialog_rect)
+                
             pygame.draw.rect(screen, WHITE, dialog_rect, 3)
 
             font_title = get_font(36)
             font_text = get_font(24)
             
-            title = font_title.render("Simulation Results", True, WHITE)
+            title = font_title.render("Simulation Results", True, DEEP_PURPLE)
             screen.blit(title, (dialog_rect.centerx - title.get_width()//2, dialog_rect.y + 40))
             
             res = getattr(self, "sim_results", {})
@@ -431,27 +437,17 @@ class GameManager:
                 
                 # If Game Over/Level Complete, draw overlay logic
                 if self.machine.game_over:
-                     # Draw simple overlay
-                     s = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.SRCALPHA)
-                     s.fill((0, 0, 0, 150))
-                     screen.blit(s, (0, 0))
-                     
-                     # In AI Mode, Machine draws the message. In GAME mode, GameManager does.
-                     is_ai = hasattr(self.machine.level_logic, "draw_hud")
-                     if not is_ai:
-                         msg = "LEVEL COMPLETE!" if self.machine.won else "GAME OVER"
-                         color = (0, 255, 0) if self.machine.won else (255, 0, 0)
-                         
-                         font = get_font(48)
-                         res_surf = font.render(msg, True, color)
-                         screen.blit(res_surf, (SCREEN_WIDTH//2 - res_surf.get_width()//2, SCREEN_HEIGHT//2 - 50))
-                     
-                     if not self.machine.won or is_ai:
-                         self.btn_menu_lc.draw(screen)
-                     elif self.mode == "GAME":
-                         # Show "Loading..." or just wait for auto transition
-                         wait_surf = get_font(24).render("Proceeding...", True, WHITE)
-                         screen.blit(wait_surf, (SCREEN_WIDTH//2 - wait_surf.get_width()//2, SCREEN_HEIGHT//2 + 50))
+                    # The Machine.draw now handles the dimming and result images
+                    is_ai = hasattr(self.machine.level_logic, "draw_hud")
+                    
+                    if not self.machine.won or is_ai:
+                        # Move button lower so it doesn't cover the result image
+                        self.btn_menu_lc.rect.centery = SCREEN_HEIGHT - 60
+                        self.btn_menu_lc.draw(screen)
+                    elif self.mode == "GAME":
+                        # Show "Loading..." or just wait for auto transition
+                        wait_surf = get_font(24).render("Proceeding...", True, DEEP_PURPLE)
+                        screen.blit(wait_surf, (SCREEN_WIDTH//2 - wait_surf.get_width()//2, SCREEN_HEIGHT - 40))
                 
                 # Draw Pause Button
                 if not self.machine.game_over:
@@ -471,7 +467,7 @@ class GameManager:
             screen.blit(s, (0, 0))
             
             font = get_font(48)
-            pause_surf = font.render("PAUSED", True, WHITE)
+            pause_surf = font.render("PAUSED", True, DEEP_PURPLE)
             screen.blit(pause_surf, (SCREEN_WIDTH//2 - pause_surf.get_width()//2, 150))
             
             self.btn_resume.draw(screen)

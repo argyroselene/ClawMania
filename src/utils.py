@@ -26,7 +26,12 @@ HIGHLIGHT_COLOR = CYAN
 
 # Fonts
 def get_font(size):
-    return pygame.font.SysFont("Arial", size)
+    try:
+        path = get_asset_path("fonts", "Pixel Game.otf")
+        return pygame.font.Font(path, size)
+    except Exception as e:
+        print(f"Failed to load custom font: {e}")
+        return pygame.font.SysFont("Arial", size)
 
 # Game Constants
 GRAVITY = 0.5
@@ -56,3 +61,11 @@ def play_bg_music(filename, volume=0.5):
         pygame.mixer.music.play(-1) # Loop indefinitely
     except Exception as e:
         print(f"Failed to play music {filename}: {e}")
+
+def load_sound(filename):
+    try:
+        path = get_asset_path("sounds", filename)
+        return pygame.mixer.Sound(path)
+    except Exception as e:
+        print(f"Failed to load sound {filename}: {e}")
+        return None
