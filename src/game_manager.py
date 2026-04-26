@@ -31,7 +31,8 @@ class GameManager:
             "slip_chance": 0.1,
             "drop_delay": 0.5,
             "release_offset": 5.0,
-            "bin_speed": 0.0
+            "bin_speed": 0.0,
+            "toy_size": "Random"
         }
         
         self.machine = None
@@ -86,8 +87,8 @@ class GameManager:
         self.btn_back_mode = Button(center_x - 100, 340, 200, 50, "Back", action=lambda: self.set_state("MODE_SELECT"))
 
         # PRACTICE CUSTOM CONFIG SLIDERS (Full set)
-        start_y = 130
-        gap = 60 # Reduced from 75 for smaller font
+        start_y = 100
+        gap = 50 # Reduced to fit 7 sliders
         s_width = 300
         self.sliders = [
             Slider(center_x - s_width//2, start_y, s_width, 0.0, 1.0, 0.8, "Grip Strength", font_size=18),
@@ -95,7 +96,8 @@ class GameManager:
             Slider(center_x - s_width//2, start_y + gap*2, s_width, 0.0, 1.0, 0.1, "Slip Chance", font_size=18),
             Slider(center_x - s_width//2, start_y + gap*3, s_width, 0.0, 2.0, 0.5, "Drop Delay (s)", font_size=18),
             Slider(center_x - s_width//2, start_y + gap*4, s_width, 0.0, 50.0, 5.0, "Release Offset", font_size=18),
-            Slider(center_x - s_width//2, start_y + gap*5, s_width, 0.0, 10.0, 0.0, "Bin Speed", font_size=18)
+            Slider(center_x - s_width//2, start_y + gap*5, s_width, 0.0, 10.0, 0.0, "Bin Speed", font_size=18),
+            Slider(center_x - s_width//2, start_y + gap*6, s_width, 0, 3, 0, "Toy Size", font_size=18, options=["Random", "Small", "Medium", "Large"])
         ]
         
         self.btn_start_custom = Button(center_x - 100, 480, 200, 50, "Start Session", action=self.start_custom_practice)
@@ -113,13 +115,14 @@ class GameManager:
 
         # SIMULATION UI
         self.sim_sliders = [
-            Slider(center_x - s_width//2, 100, s_width, 0.0, 1.0, 0.8, "Grip Strength", font_size=18),
-            Slider(center_x - s_width//2, 100 + 50, s_width, 1.0, 10.0, 5.0, "Lift Speed", font_size=18),
-            Slider(center_x - s_width//2, 100 + 50*2, s_width, 0.0, 1.0, 0.1, "Slip Chance", font_size=18),
-            Slider(center_x - s_width//2, 100 + 50*3, s_width, 0.0, 2.0, 0.5, "Drop Delay (s)", font_size=18),
-            Slider(center_x - s_width//2, 100 + 50*4, s_width, 0.0, 50.0, 5.0, "Release Offset", font_size=18),
-            Slider(center_x - s_width//2, 100 + 50*5, s_width, 0.0, 10.0, 0.0, "Bin Speed", font_size=18),
-            Slider(center_x - s_width//2, 100 + 50*6, s_width, 100, 100000, 1000, "Iterations", font_size=18)
+            Slider(center_x - s_width//2, 80, s_width, 0.0, 1.0, 0.8, "Grip Strength", font_size=18),
+            Slider(center_x - s_width//2, 80 + 45, s_width, 1.0, 10.0, 5.0, "Lift Speed", font_size=18),
+            Slider(center_x - s_width//2, 80 + 45*2, s_width, 0.0, 1.0, 0.1, "Slip Chance", font_size=18),
+            Slider(center_x - s_width//2, 80 + 45*3, s_width, 0.0, 2.0, 0.5, "Drop Delay (s)", font_size=18),
+            Slider(center_x - s_width//2, 80 + 45*4, s_width, 0.0, 50.0, 5.0, "Release Offset", font_size=18),
+            Slider(center_x - s_width//2, 80 + 45*5, s_width, 0.0, 10.0, 0.0, "Bin Speed", font_size=18),
+            Slider(center_x - s_width//2, 80 + 45*6, s_width, 0, 3, 0, "Toy Size", font_size=18, options=["Random", "Small", "Medium", "Large"]),
+            Slider(center_x - s_width//2, 80 + 45*7, s_width, 100, 100000, 1000, "Iterations", font_size=18)
         ]
         self.btn_start_sim = Button(center_x - 100, 480, 200, 50, "Run Simulation", action=self.start_simulation)
         self.btn_back_sim = Button(10, 10, 100, 40, "Back", action=lambda: self.set_state("MENU"))
@@ -173,7 +176,8 @@ class GameManager:
             "slip_chance": 0.1,
             "drop_delay": 0.5,
             "release_offset": 5.0,
-            "bin_speed": 0.0
+            "bin_speed": 0.0,
+            "toy_size": "Random"
         }
         self.start_game()
         
@@ -186,6 +190,9 @@ class GameManager:
         self.config["release_offset"] = self.sliders[4].value
         self.config["bin_speed"] = self.sliders[5].value
         
+        idx = max(0, min(3, int(round(self.sliders[6].value))))
+        self.config["toy_size"] = ["Random", "Small", "Medium", "Large"][idx]
+        
         self.start_game()
 
     def start_game(self):
@@ -197,7 +204,7 @@ class GameManager:
         self.set_state("GAME")
 
     def start_simulation(self):
-        self.sim_total_iterations = int(self.sim_sliders[6].value)
+        self.sim_total_iterations = int(self.sim_sliders[7].value)
         self.sim_timer = pygame.time.get_ticks()
         self.set_state("SIMULATION_RUNNING")
 
@@ -209,8 +216,16 @@ class GameManager:
         drop_delay = config.get("drop_delay", 0.5)
         release_offset = config.get("release_offset", 5.0)
         bin_speed = config.get("bin_speed", 0.0)
+        toy_size = config.get("toy_size", "Random")
         
-        toy_diff = 1.0 # Assume average
+        if toy_size == "Small":
+            toy_diff = 1.2
+        elif toy_size == "Medium":
+            toy_diff = 1.0
+        elif toy_size == "Large":
+            toy_diff = 0.8
+        else:
+            toy_diff = (1.2 + 1.0 + 0.8) / 3.0 # Assume average
         
         # Calculate alignment loss due to bin movement during drop_delay
         frames_delay = drop_delay * 60
@@ -250,6 +265,8 @@ class GameManager:
         return (wins / iterations) * 100
 
     def run_simulation(self):
+        idx = max(0, min(3, int(round(self.sim_sliders[6].value))))
+        
         config_from_sliders = {
             "grip_strength": self.sim_sliders[0].value,
             "lift_speed": self.sim_sliders[1].value,
@@ -257,8 +274,9 @@ class GameManager:
             "drop_delay": self.sim_sliders[3].value,
             "release_offset": self.sim_sliders[4].value,
             "bin_speed": self.sim_sliders[5].value,
+            "toy_size": ["Random", "Small", "Medium", "Large"][idx]
         }
-        iterations = int(self.sim_sliders[6].value)
+        iterations = int(self.sim_sliders[7].value)
         
         prob = self.calculate_theoretical_probability(config_from_sliders, iterations)
         

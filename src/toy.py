@@ -69,7 +69,7 @@ class Toy:
                 self.on_ground = True
                 
                 
-                self.x += bin_velocity # Friction?
+                self.x += bin_velocity 
             else:
                  self.on_ground = False
 

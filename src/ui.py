@@ -50,10 +50,11 @@ class Button:
                 self.action()
 
 class Slider:
-    def __init__(self, x, y, width, min_val, max_val, initial_val, label, font_size=20):
+    def __init__(self, x, y, width, min_val, max_val, initial_val, label, font_size=20, options=None):
         self.rect = pygame.Rect(x, y, width, 18) # Slightly thicker track for bigger font
+        self.options = options
         self.min_val = min_val
-        self.max_val = max_val
+        self.max_val = max_val if options is None else len(options) - 1
         self.value = initial_val
         self.label = label
         self.font_size = font_size
@@ -68,7 +69,15 @@ class Slider:
     def draw(self, screen):
         # Draw label
         font = get_font(self.font_size)
-        label_surf = font.render(f"{self.label}: {self.value:.2f}", False, DEEP_PURPLE)
+        
+        if self.options:
+            idx = int(round(self.value))
+            idx = max(0, min(len(self.options)-1, idx))
+            display_str = self.options[idx]
+        else:
+            display_str = f"{self.value:.2f}"
+            
+        label_surf = font.render(f"{self.label}: {display_str}", False, DEEP_PURPLE)
         screen.blit(label_surf, (self.rect.x, self.rect.y - self.font_size - 10))
         
         # Draw track

@@ -86,9 +86,13 @@ class Machine:
              if hasattr(self.level_logic, "config") and "num_toys" in self.level_logic.config:
                  num_toys = self.level_logic.config["num_toys"]
 
+        toy_size_pref = self.config.get("toy_size", "Random")
         for i in range(num_toys):
-             # varying sizes
-            size = random.choice(["small", "medium", "large"])
+            if toy_size_pref == "Random":
+                size = random.choice(["small", "medium", "large"])
+            else:
+                size = toy_size_pref.lower()
+                
             # Randomly distribute across the bin width
             spawn_x = random.randint(int(self.bin.x + 20), int(self.bin.x + self.bin.width - 60))
             
