@@ -5,7 +5,7 @@ class Button:
     # Class-level cache for images to avoid reloading for every button
     img_normal = None
     
-    def __init__(self, x, y, width, height, text, action=None, color=UI_BG_COLOR, hover_color=HOT_PINK, text_color=DEEP_PURPLE):
+    def __init__(self, x, y, width, height, text, action=None, color=UI_BG_COLOR, hover_color=HOT_PINK, text_color=WHITE):
         self.rect = pygame.Rect(x, y, width, height)
         self.text = text
         self.action = action
@@ -24,7 +24,7 @@ class Button:
         is_hovered = self.rect.collidepoint(mouse_pos)
         
         current_color = self.hover_color if is_hovered else self.color
-        current_text_color = DEEP_PURPLE if is_hovered else self.text_color
+        current_text_color = WHITE
         
         # Draw Button Background
         if Button.img_normal:

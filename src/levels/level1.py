@@ -65,7 +65,7 @@ class Level1:
             status["message"] = "Out of Chances!"
         else:
             toys_rem = self.toys_needed - self.toys_collected
-            status["message"] = f"Toys Left: {toys_rem} | Chances: {self.max_attempts - self.attempts_used}"
+            status["message"] = f"Toys Left: {toys_rem}"
 
         return status
 

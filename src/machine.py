@@ -3,7 +3,7 @@ import random
 from src.claw import Claw
 from src.bin import Bin
 from src.toy import Toy
-from src.utils import SCREEN_WIDTH, SCREEN_HEIGHT, load_image, get_font, WHITE, BLACK
+from src.utils import SCREEN_WIDTH, SCREEN_HEIGHT, load_image, get_font, WHITE, BLACK, load_sound, DEEP_PURPLE
 
 class Machine:
     def __init__(self, config, level_logic=None, persistence=None):
@@ -39,6 +39,7 @@ class Machine:
         self.score = 0
         self.game_over = False
         self.won = False
+        self.is_tie = False
         
         # Timer System
         self.attempt_active = False # True when "START" pressed, False when IDLE/Frozen
@@ -62,6 +63,18 @@ class Machine:
         # Popup Feedback
         self.popup_message = None
         self.popup_end_time = 0
+
+        # Load Sprites
+        self.heart_img = load_image("heart.png", 40, 40)
+        self.win_img = load_image("win.png", 500, 350)
+        self.defeat_img = load_image("lose.png", 500, 350)
+        self.tie_img = load_image("tie.png", 500, 350)
+
+        # Load Sounds
+        self.drop_snd = load_sound("drop.mp3")
+        self.win_snd = load_sound("win.mp3")
+        self.lose_snd = load_sound("lose.mp3")
+        self.result_sound_played = False
 
     def populate_toys(self):
         # Create a few rows of toys inside the bin
@@ -183,10 +196,19 @@ class Machine:
             if status["game_over"]:
                 self.game_over = True
                 self.won = status["success"]
+                self.is_tie = status.get("is_tie", False)
                 if self.won and self.persistence:
                     self.persistence.add_xp(50) # Level bonus
                     status["message"] += " +50 XP!"
                 self.last_result = status["message"]
+                
+                # Play Result Sound once
+                if not self.result_sound_played:
+                    if self.won:
+                        if self.win_snd: self.win_snd.play()
+                    else:
+                        if self.lose_snd: self.lose_snd.play()
+                    self.result_sound_played = True
             elif status["message"]:
                  self.last_result = status["message"]
 
@@ -233,12 +255,12 @@ class Machine:
         
         # Hide global score in AI Mode
         if not is_ai:
-            score_surf = font.render(f"Score: {self.score}", False, WHITE)
+            score_surf = font.render(f"Score: {self.score}", False, DEEP_PURPLE)
             screen.blit(score_surf, (SCREEN_WIDTH - 150, 10))
             
         # Draw Win Probability if available
         if hasattr(self, 'win_probability') and self.win_probability is not None:
-             prob_text = font.render(f"Win Prob: {self.win_probability:.1f}%", True, WHITE)
+             prob_text = font.render(f"Win Prob: {self.win_probability:.1f}%", True, DEEP_PURPLE)
              
              bar_w = 150
              bar_h = 20
@@ -271,10 +293,15 @@ class Machine:
              
              # Chances
              rem_chances = self.level_logic.max_attempts - self.level_logic.attempts_used
-             chances_str = f"Chances: {max(0, rem_chances)}" 
-             c_color = (255, 50, 50) if rem_chances <= 1 else (0, 255, 0)
-             chances_surf = font.render(chances_str, False, c_color)
-             screen.blit(chances_surf, (20, 40))
+             
+             if self.heart_img:
+                 for i in range(max(0, rem_chances)):
+                     screen.blit(self.heart_img, (20 + i * 45, 40))
+             else:
+                 chances_str = f"Chances: {max(0, rem_chances)}" 
+                 c_color = (255, 50, 50) if rem_chances <= 1 else (0, 255, 0)
+                 chances_surf = font.render(chances_str, False, c_color)
+                 screen.blit(chances_surf, (20, 40))
              
              # Feedback Message (Below stats)
              if self.last_result:
@@ -299,14 +326,28 @@ class Machine:
             self.popup_message = None # Reset
 
         if self.game_over:
-             # Use the message from level logic if available
-             msg = self.last_result if self.last_result else ("LEVEL COMPLETE!" if self.won else "GAME OVER")
-             color = (0, 255, 0) if self.won else (255, 0, 0)
-             go_font = get_font(48)
-             go_surf = go_font.render(msg, False, color)
-             
-             # Center text
-             screen.blit(go_surf, (SCREEN_WIDTH//2 - go_surf.get_width()//2, SCREEN_HEIGHT//2 - 50))
+             # 1. Dim the background scene
+             overlay = pygame.Surface((SCREEN_WIDTH, SCREEN_HEIGHT), pygame.SRCALPHA)
+             overlay.fill((0, 0, 0, 160)) # Semi-transparent black
+             screen.blit(overlay, (0, 0))
+
+             # 2. Draw Result Image (Bright)
+             result_img = None
+             if self.is_tie:
+                 result_img = self.tie_img
+             else:
+                 result_img = self.win_img if self.won else self.defeat_img
+                 
+             if result_img:
+                 img_rect = result_img.get_rect(center=(SCREEN_WIDTH//2, SCREEN_HEIGHT//2))
+                 screen.blit(result_img, img_rect)
+             else:
+                 # Fallback to text
+                 msg = self.last_result if self.last_result else ("LEVEL COMPLETE!" if self.won else "GAME OVER")
+                 color = (255, 255, 0) if self.is_tie else ((0, 255, 0) if self.won else (255, 0, 0))
+                 go_font = get_font(48)
+                 go_surf = go_font.render(msg, False, color)
+                 screen.blit(go_surf, (SCREEN_WIDTH//2 - go_surf.get_width()//2, SCREEN_HEIGHT//2))
         
         # Draw Start Button if needed
         if not self.attempt_active and not self.game_over and self.claw.state == "IDLE":
@@ -357,6 +398,10 @@ class Machine:
             self.claw.held_toy.grabbed = False
             # Ensure gravity takes over
             self.claw.held_toy = None
+            
+            # Play drop sound
+            if self.drop_snd:
+                self.drop_snd.play()
 
     def attempt_grab(self):
         if self.level_logic:

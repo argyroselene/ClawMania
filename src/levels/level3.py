@@ -81,8 +81,7 @@ class Level3:
         # HUD
         if not self.message:
             status["message"] = (
-                f"Toys: {self.toys_collected}/{self.toys_needed} | "
-                f"Chances: {self.max_attempts - self.attempts_used}"
+                f"Toys: {self.toys_collected}/{self.toys_needed}"
             )
         else:
             status["message"] = self.message
